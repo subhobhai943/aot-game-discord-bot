@@ -10,13 +10,24 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+COGS = [
+    "cogs.battle",
+    "cogs.lore",
+    "cogs.odm",
+    "cogs.profile",
+    "cogs.arena",
+]
+
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user}")
-    await bot.load_extension("cogs.battle")
-    await bot.load_extension("cogs.lore")
-    await bot.load_extension("cogs.odm")
+    print(f"\u2705 Logged in as {bot.user}")
+    for cog in COGS:
+        try:
+            await bot.load_extension(cog)
+            print(f"  \u2714 Loaded {cog}")
+        except Exception as e:
+            print(f"  \u274c Failed to load {cog}: {e}")
     await bot.tree.sync()
-    print("✅ Slash commands synced!")
+    print("\u2705 All slash commands synced!")
 
 bot.run(os.getenv("DISCORD_TOKEN"))

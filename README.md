@@ -1,13 +1,16 @@
-# 🪽 AoT Game Discord Bot
+# 🪽 AoT Game Discord Bot — Advanced Edition
 
-A feature-rich Discord bot for Attack on Titan fans, powered by [aot-toolkit](https://github.com/subhobhai943/aot-toolkit).
+A full-featured Attack on Titan Discord game bot powered by [aot-toolkit](https://github.com/subhobhai943/aot-toolkit).
 
 ## ✨ Features
 
-- ⚔️ **Battle Simulation** — Simulate encounters between scouts and titans
-- 🪂 **ODM Gear Mini-Game** — Grapple and nape strike simulations
-- 📖 **Lore Lookup** — Characters, titans, and quotes from offline database
-- 🎮 **Slash Commands** — Modern Discord slash command interface
+- ⚔️ **Turn-Based Battle System** with interactive buttons
+- 🎨 **Dynamic Battle Images** generated with Pillow (HP bars, scout vs titan silhouettes, phase effects)
+- 📊 **Player Profiles** with level, XP, rank, win/loss stats — rendered as image cards
+- 🧙 **Scout Selection** — choose from 9 AoT characters
+- 👹 **9 Titan Opponents** with unique HP scaling
+- 📖 **Lore Lookup** — characters, titans, quotes
+- 🪂 **ODM Gear Mini-Game**
 
 ## 📦 Installation
 
@@ -20,39 +23,32 @@ pip install -r requirements.txt
 ## ⚙️ Setup
 
 1. Copy `.env.example` to `.env`
-2. Add your Discord bot token:
-   ```
-   DISCORD_TOKEN=your_bot_token_here
-   ```
-3. Run the bot:
-   ```bash
-   python bot.py
-   ```
+2. Add your Discord bot token
+3. Run: `python bot.py`
 
 ## 🤖 Slash Commands
 
 | Command | Description |
 |---|---|
-| `/character <name>` | Look up a character (e.g. Levi, Mikasa) |
-| `/titan <name>` | Look up a titan (e.g. Beast, Armored) |
-| `/quote [tag]` | Random quote, optional tag: motivational, dark, wisdom |
-| `/battle <character> <titan>` | Full combat narrative simulation |
-| `/odm_grapple <distance> [speed] [gas]` | ODM grapple mini-game |
-| `/odm_strike [armor_level] [abilities]` | Nape strike simulation |
+| `/fight <titan>` | Start a turn-based battle with image rendering |
+| `/flee` | Flee from active battle (counts as loss) |
+| `/profile` | View your profile card as an image |
+| `/choose_scout <character>` | Select your scout character |
+| `/character <name>` | Look up character lore |
+| `/titan <name>` | Look up titan info |
+| `/quote [tag]` | Random AoT quote |
+| `/simulate <char> <titan>` | Cinematic narrative simulation |
+| `/odm_grapple <distance>` | ODM gear grapple sim |
+| `/odm_strike [armor_level]` | Nape strike simulation |
 
-## 🧱 Project Structure
+## 🎨 Battle Image System
 
-```
-aot-game-discord-bot/
-├── bot.py              # Main entry point
-├── cogs/
-│   ├── battle.py       # Combat simulation commands
-│   ├── lore.py         # Character/titan/quote commands
-│   └── odm.py          # ODM gear mini-game commands
-├── requirements.txt
-├── .env.example
-└── .gitignore
-```
+Each `/fight` turn generates a fresh battle image showing:
+- Scout vs Titan silhouettes with glow auras
+- Dynamic HP bars (green → yellow → red)
+- Round counter
+- Last action log
+- Phase-based sky background (normal → intense → victory/defeat)
 
 ## 📄 License
 
