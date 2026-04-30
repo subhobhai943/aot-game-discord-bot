@@ -3,7 +3,23 @@ from discord.ext import commands
 from discord import app_commands
 from utils.game_state import GameState, TITANS, MOVES, calc_move, titan_ai_move
 from utils.image_gen import generate_battle_image
+from utils.gifs import get_gif
 import os
+
+
+# ── GIF mappings for each move and result ──────────────────────────────────
+# Format: (nekos_fallback_action, tenor_search_query)
+MOVE_GIFS: dict[str, tuple[str, str]] = {
+    "slash":         ("kick",   "mikasa blade slash"),
+    "odm_dash":      ("kick",   "odm gear swing attack"),
+    "thunder_spear": ("shoot",  "thunder spear explosion"),
+    "spiral_cut":    ("kick",   "mikasa spiral cut"),
+    "titan_smash":   ("punch",  "titan smash stomp"),
+    "defend":        ("shrug",  "scout dodge evade"),
+}
+TITAN_COUNTER_GIF = ("punch",  "titan attack roar")
+VICTORY_GIF       = ("happy",  "victory celebrate kill titan")
+DEFEAT_GIF        = ("cry",    "death fallen soldier sad")
 
 
 def _battle_phase(scout_hp: int, scout_max: int,
@@ -93,7 +109,11 @@ class MoveView(discord.ui.View):
 
         log_lines = []
 
-        # ── Player move ────────────────────────────────────────────────────
+        # ── Fetch move GIF (async, before building embeds) ───────────────────
+        nk, tq = MOVE_GIFS.get(move_key, ("kick", "attack on titan battle"))
+        move_gif = await get_gif(nk, tq)
+
+        # ── Player move ─────────────────────────────────────────────────────
         if move_key == "defend":
             heal = 20
             session.scout_hp = min(session.scout_max_hp, session.scout_hp + heal)
@@ -134,6 +154,9 @@ class MoveView(discord.ui.View):
             )
             file = discord.File(fp=img, filename="battle.png")
             lv_txt = "  \u2b06\ufe0f **Level Up!**" if levelled else ""
+
+            v_gif = await get_gif(*VICTORY_GIF)
+
             embed = discord.Embed(
                 title="\U0001f3c6 VICTORY!",
                 description=(
@@ -144,12 +167,14 @@ class MoveView(discord.ui.View):
                 color=discord.Color.green(),
             )
             embed.set_image(url="attachment://battle.png")
+            if v_gif:
+                embed.set_thumbnail(url=v_gif)
             await interaction.edit_original_response(
                 embed=embed, attachments=[file], view=None
             )
             return
 
-        # ── Titan counter-attack ────────────────────────────────────────────
+        # ── Titan counter-attack ─────────────────────────────────────────────
         t_dmg, t_missed, t_desc = titan_ai_move()
         if t_missed:
             log_lines.append(
@@ -161,6 +186,9 @@ class MoveView(discord.ui.View):
                 f"\U0001f9f1 **{session.titan_name}** {t_desc} "
                 f"\u2192 **{t_dmg} dmg** to {session.scout_name}!"
             )
+
+        # Fetch titan counter GIF
+        titan_gif = await get_gif(*TITAN_COUNTER_GIF)
 
         session.round_num += 1
         session.last_action = " | ".join(log_lines)
@@ -185,6 +213,9 @@ class MoveView(discord.ui.View):
                 round_num=session.round_num,
             )
             file = discord.File(fp=img, filename="battle.png")
+
+            d_gif = await get_gif(*DEFEAT_GIF)
+
             embed = discord.Embed(
                 title="\u2620\ufe0f FALLEN IN BATTLE",
                 description=(
@@ -194,12 +225,14 @@ class MoveView(discord.ui.View):
                 color=discord.Color.red(),
             )
             embed.set_image(url="attachment://battle.png")
+            if d_gif:
+                embed.set_thumbnail(url=d_gif)
             await interaction.edit_original_response(
                 embed=embed, attachments=[file], view=None
             )
             return
 
-        # ── Battle continues ───────────────────────────────────────────────
+        # ── Battle continues ──────────────────────────────────────────────────
         phase = _battle_phase(
             session.scout_hp, session.scout_max_hp,
             session.titan_hp, session.titan_max_hp,
@@ -220,6 +253,10 @@ class MoveView(discord.ui.View):
             color=discord.Color.red(),
         )
         embed.set_image(url="attachment://battle.png")
+        # Show move GIF as thumbnail (player move) — titan counter GIF alternates if it hit
+        active_gif = titan_gif if (not t_missed and t_dmg > 0) else move_gif
+        if active_gif:
+            embed.set_thumbnail(url=active_gif)
         new_view = MoveView(self.player_id, self.bot)
         await interaction.edit_original_response(
             embed=embed, attachments=[file], view=new_view
@@ -236,7 +273,7 @@ class MoveView(discord.ui.View):
 class Arena(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        os.makedirs("data", exist_ok=True)  # Ensure data dir exists
+        os.makedirs("data", exist_ok=True)
 
     @app_commands.command(
         name="fight",

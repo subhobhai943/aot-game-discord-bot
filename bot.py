@@ -8,10 +8,13 @@ load_dotenv()
 
 
 def get_prefix_for_bot(bot, message):
-    """Dynamic prefix per server."""
+    """Dynamic prefix per server.
+    Returns BOTH 'aot help' (with space) AND 'aothelp' (no space) so either works.
+    """
     if message.guild:
-        return get_prefix(message.guild.id)
-    return "!"
+        p = get_prefix(message.guild.id)
+        return [p + " ", p]   # try 'aot help' first, then 'aothelp'
+    return ["! ", "!"]
 
 
 intents = discord.Intents.default()
@@ -27,20 +30,21 @@ COGS = [
     "cogs.odm",
     "cogs.profile",
     "cogs.arena",
+    "cogs.gifs",   # OwO-style AoT reaction GIF commands
 ]
 
 
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user}")
+    print(f"\u2705 Logged in as {bot.user}")
     for cog in COGS:
         try:
             await bot.load_extension(cog)
-            print(f"  ✔ Loaded {cog}")
+            print(f"  \u2714 Loaded {cog}")
         except Exception as e:
-            print(f"  ❌ Failed to load {cog}: {e}")
+            print(f"  \u274c Failed to load {cog}: {e}")
     await bot.tree.sync()
-    print("✅ All slash commands synced!")
+    print("\u2705 All slash commands synced!")
 
 
 bot.run(os.getenv("DISCORD_TOKEN"))
