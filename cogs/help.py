@@ -24,6 +24,40 @@ HELP_PAGES = {
             ("/choose_scout <name>",  "Choose your scout character for battles"),
         ],
     },
+    "🧩 Mikasa": {
+        "color": discord.Color.dark_red(),
+        "emoji": "🧩",
+        "desc": "Mikasa Ackerman-themed interactions and devotion commands.",
+        "commands": [
+            ("/mikasa <action> [@user]",  "Mikasa actions: red_scarf, protect, devotion, etc."),
+            ("/ackerman_bond <user>",     "Check your Ackerman-style bond with another user"),
+            ("/mikasa_stats",             "View Mikasa's combat statistics and profile"),
+            ("/red_scarf [@user]",        "Wrap the iconic red scarf around someone"),
+        ],
+    },
+    "🎮 Games": {
+        "color": discord.Color.gold(),
+        "emoji": "🎮",
+        "desc": "Fun minigames: AoT trivia, titan spawn, ODM training, and more!",
+        "commands": [
+            ("/trivia",             "Play an AoT trivia challenge"),
+            ("/spawn_titan",        "Simulate a Titan spawning in the wasteland"),
+            ("/odm_training",       "Test your ODM gear skills in training"),
+            ("/daily_challenge",    "Get today's AoT daily challenge for XP"),
+            ("/aot_fact",           "Get a random Attack on Titan fact"),
+        ],
+    },
+    "⚡ Abilities": {
+        "color": discord.Color.orange(),
+        "emoji": "⚡",
+        "desc": "Special abilities, titan transformations, and gear upgrades.",
+        "commands": [
+            ("/ability",           "Use your scout's signature special ability"),
+            ("/transform <titan>", "Transform into a Titan (simulation)"),
+            ("/gear_upgrade",      "View and upgrade your ODM gear components"),
+            ("/scout_ranking",     "View the top 10 Scouts on the leaderboard"),
+        ],
+    },
     "📖 Lore": {
         "color": discord.Color.gold(),
         "emoji": "📖",

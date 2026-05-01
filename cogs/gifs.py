@@ -9,7 +9,7 @@ REACTIONS: dict[str, tuple[str, str, str, str]] = {
     "pat":       ("pat",       "attack on titan pat",                 "🤚", "{author} pats {target}!"),
     "slap":      ("slap",      "attack on titan slap",                "👋", "{author} slaps {target}! 💥"),
     "bonk":      ("bonk",      "levi ackerman hit",                   "🔨", "{author} bonks {target}! 🔨"),
-    "wave":      ("wave",      "attack on titan salute",              "👋", "{author} waves at {target}!"),
+    "wave":      ("wave",      "anime wave hello friendly",              "👋", "{author} waves at {target}!"),
     "poke":      ("poke",      "attack on titan poke",                "👉", "{author} pokes {target}!"),
     "kiss":      ("kiss",      "eren mikasa",                         "💋", "{author} kisses {target}!"),
     "cry":       ("cry",       "attack on titan cry",                 "😢", "{author} is crying..."),

@@ -119,27 +119,48 @@ def _draw_aura(
 def _draw_silhouette_scout(
     draw: ImageDraw.ImageDraw, cx: int, cy: int, color: tuple
 ) -> None:
-    draw.ellipse([cx-14, cy-60, cx+14, cy-32], fill=color)       # head
-    draw.line([(cx, cy-32), (cx, cy+20)], fill=color, width=5)   # torso
-    draw.line([(cx, cy-20), (cx-30, cy-5)], fill=color, width=4) # left arm
-    draw.line([(cx, cy-20), (cx+30, cy-5)], fill=color, width=4) # right arm
-    draw.line([(cx, cy+20), (cx-18, cy+55)], fill=color, width=4)# left leg
-    draw.line([(cx, cy+20), (cx+18, cy+55)], fill=color, width=4)# right leg
-    draw.line([(cx-30, cy-5), (cx-60, cy+10)], fill=COLORS["accent_gold"], width=2)
-    draw.line([(cx+30, cy-5), (cx+60, cy+10)], fill=COLORS["accent_gold"], width=2)
+    draw.ellipse([cx-14, cy-60, cx+14, cy-32], fill=color)
+    draw.polygon([(cx-35, cy-25), (cx, cy-45), (cx+35, cy-25), (cx, cy-5)], fill=color)
+    draw.line([(cx, cy-20), (cx, cy+20)], fill=color, width=6)
+    draw.line([(cx, cy-15), (cx-35, cy-10)], fill=color, width=4)
+    draw.line([(cx, cy-15), (cx+35, cy-10)], fill=color, width=4)
+    draw.ellipse([cx-40, cy-12, cx-30, cy-2], fill=COLORS["accent_gold"])
+    draw.ellipse([cx+30, cy-12, cx+40, cy-2], fill=COLORS["accent_gold"])
+    draw.line([(cx, cy+20), (cx-20, cy+60)], fill=color, width=5)
+    draw.line([(cx, cy+20), (cx+20, cy+60)], fill=color, width=5)
+    draw.line([(cx-35, cy-10), (cx-55, cy-35)], fill=COLORS["accent_gold"], width=1)
+    draw.line([(cx+35, cy-10), (cx+55, cy-35)], fill=COLORS["accent_gold"], width=1)
+    draw.line([(cx-50, cy-40), (cx-30, cy-60)], fill=COLORS["accent_gold"], width=1)
+    draw.line([(cx+30, cy-60), (cx+50, cy-40)], fill=COLORS["accent_gold"], width=1)
+    draw.ellipse([cx-15, cy+10, cx+15, cy+28], outline=COLORS["accent_gold"], width=2)
 
 
 def _draw_silhouette_titan(
     draw: ImageDraw.ImageDraw, cx: int, cy: int, color: tuple
 ) -> None:
-    draw.ellipse([cx-30, cy-100, cx+30, cy-45], fill=color)         # head
-    draw.ellipse([cx-18, cy-85,  cx-6,  cy-70], fill=(255, 80, 80)) # left eye
-    draw.ellipse([cx+6,  cy-85,  cx+18, cy-70], fill=(255, 80, 80)) # right eye
-    draw.rectangle([cx-38, cy-45, cx+38, cy+60], fill=color)        # body
-    draw.line([(cx-38, cy-30), (cx-75, cy+20)], fill=color, width=16)
-    draw.line([(cx+38, cy-30), (cx+75, cy+20)], fill=color, width=16)
-    draw.line([(cx-20, cy+60), (cx-25, cy+120)], fill=color, width=18)
-    draw.line([(cx+20, cy+60), (cx+25, cy+120)], fill=color, width=18)
+    # More detailed AoT titan silhouette with glowing eyes and muscular form
+    # Head with more detail
+    draw.ellipse([cx-30, cy-100, cx+30, cy-45], fill=color)
+    # Glowing red eyes - more prominent
+    draw.ellipse([cx-20, cy-82, cx-7, cy-68], fill=(255, 100, 100))
+    draw.ellipse([cx+7,  cy-82, cx+20, cy-68], fill=(255, 100, 100))
+    # Eye shine detail
+    draw.ellipse([cx-16, cy-78, cx-10, cy-72], fill=(255, 220, 220))
+    draw.ellipse([cx+10, cy-78, cx+16, cy-72], fill=(255, 220, 220))
+    # Muscular torso with layered blocks for detail
+    draw.rectangle([cx-38, cy-45, cx+38, cy+60], fill=color)
+    # Chest detail lines
+    draw.line([(cx-15, cy-30), (cx-15, cy+20)], fill=COLORS["accent_red"], width=1)
+    draw.line([(cx+15, cy-30), (cx+15, cy+20)], fill=COLORS["accent_red"], width=1)
+    # Arms - thicker and more muscular
+    draw.line([(cx-38, cy-25), (cx-80, cy+25)], fill=color, width=20)
+    draw.line([(cx+38, cy-25), (cx+80, cy+25)], fill=color, width=20)
+    # Legs - thick and powerful
+    draw.line([(cx-20, cy+60), (cx-35, cy+130)], fill=color, width=22)
+    draw.line([(cx+20, cy+60), (cx+35, cy+130)], fill=color, width=22)
+    # Titan nape detail (smaller target area indicator)
+    draw.circle([cx, cy+150], 12, fill=COLORS["accent_gold"])
+    draw.circle([cx, cy+150], 8, fill=color)
 
 
 def _draw_background(img: Image.Image, phase: str) -> None:
