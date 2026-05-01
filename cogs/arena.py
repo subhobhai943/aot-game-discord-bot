@@ -10,16 +10,16 @@ import os
 # ── GIF mappings for each move and result ──────────────────────────────────
 # Format: (nekos_fallback_action, tenor_search_query)
 MOVE_GIFS: dict[str, tuple[str, str]] = {
-    "slash":         ("kick",   "mikasa blade slash"),
-    "odm_dash":      ("kick",   "odm gear swing attack"),
-    "thunder_spear": ("shoot",  "thunder spear explosion"),
-    "spiral_cut":    ("kick",   "mikasa spiral cut"),
-    "titan_smash":   ("punch",  "titan smash stomp"),
-    "defend":        ("shrug",  "scout dodge evade"),
+    "slash":         ("kick",   "anime sword slash"),
+    "odm_dash":      ("kick",   "anime grapple swing"),
+    "thunder_spear": ("shoot",  "thunder spear attack"),
+    "spiral_cut":    ("kick",   "anime spiral slash"),
+    "titan_smash":   ("punch",  "anime ground smash"),
+    "defend":        ("shrug",  "anime dodge quick"),
 }
-TITAN_COUNTER_GIF = ("punch",  "titan attack roar")
-VICTORY_GIF       = ("happy",  "victory celebrate kill titan")
-DEFEAT_GIF        = ("cry",    "death fallen soldier sad")
+TITAN_COUNTER_GIF = ("punch",  "titan roar attack")
+VICTORY_GIF       = ("happy",  "anime victory celebration")
+DEFEAT_GIF        = ("cry",    "anime death sad")
 
 
 def _battle_phase(scout_hp: int, scout_max: int,

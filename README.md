@@ -19,13 +19,17 @@ Powered by [aot-toolkit](https://github.com/subhobhai943/aot-toolkit) • Built 
 | Feature | Description |
 |---|---|
 | ⚔️ **Turn-Based Combat** | Interactive button-driven battles against 9 titan opponents |
-| 🎨 **Dynamic Battle Images** | Every turn generates a live battle scene via Pillow |
+| 🎨 **Enhanced Battle Images** | Live scenes with detailed scout/titan silhouettes & ODM gear effects |
 | 📊 **Player Profiles** | XP, levels, rank, win/loss stats rendered as image cards |
 | 🧙 **Scout Selection** | Choose from 9 iconic AoT characters |
 | 👹 **Titan Roster** | 9 titans with unique HP scaling and difficulty |
 | 📖 **Lore Lookup** | Offline character, titan & quote database via aot-toolkit |
 | 🪂 **ODM Gear Mini-Game** | Grapple and nape strike simulations |
 | 🏆 **Rank System** | Cadet → Scout → Elite → Captain → Legend |
+| 🎮 **Fun Games** | Trivia, Titan Spawn Simulator, ODM Training, Daily Challenges |
+| ⚡ **Character Abilities** | Scout special powers & Titan Transformation Simulator |
+| 🛠️ **Gear Upgrades** | Upgrade ODM blades, gas tanks, handles, and thrusters |
+| 🧩 **Mikasa Mode** | Red scarf, protection, devotion, and Ackerman bond features |
 
 ---
 
@@ -52,11 +56,35 @@ Every `/fight` turn dynamically generates a **fresh battle image** using Pillow:
 | `/flee` | Flee from your active battle (counts as a loss) |
 | `/simulate <character> <titan>` | Cinematic narrative-style battle simulation |
 
-### 🤹 Player Commands
+### 🧙 Player Commands
 | Command | Description |
 |---|---|
 | `/profile` | View your profile card as a rendered image |
 | `/choose_scout <character>` | Select your scout character for battles |
+
+### 🧩 Mikasa Commands
+| Command | Description |
+|---|---|
+| `/mikasa <action> [user]` | Mikasa actions: red_scarf, protect, devotion, etc. |
+| `/ackerman_bond <user>` | Check your Ackerman-style bond with another user |
+| `/mikasa_stats` | View Mikasa's combat statistics and profile |
+
+### 🎮 Game Commands
+| Command | Description |
+|---|---|
+| `/trivia` | Play an AoT trivia challenge with reactions |
+| `/spawn_titan` | Simulate a random Titan spawn (Common to Legendary) |
+| `/odm_training [difficulty]` | Test ODM skills with obstacle course |
+| `/daily_challenge` | Get today's daily challenge for bonus XP |
+| `/aot_fact` | Get a random Attack on Titan fact |
+
+### ⚡ Ability Commands
+| Command | Description |
+|---|---|
+| `/ability` | Use your scout's signature special ability |
+| `/transform <titan>` | Transform into a Titan (simulation) |
+| `/gear_upgrade` | View/upgrade ODM gear components |
+| `/scout_ranking` | View top 10 Scouts on leaderboard |
 
 ### 📖 Lore Commands
 | Command | Description |

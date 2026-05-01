@@ -31,6 +31,9 @@ COGS = [
     "cogs.profile",
     "cogs.arena",
     "cogs.gifs",   # OwO-style AoT reaction GIF commands
+    "cogs.mikasa", # Mikasa Ackerman specific features
+    "cogs.games",  # Trivia, titan spawn, ODM training games
+    "cogs.abilities", # Character abilities and titan transformations
 ]
 
 
