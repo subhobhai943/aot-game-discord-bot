@@ -19,6 +19,7 @@ def get_prefix_for_bot(bot, message):
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True  # Required for AFK nickname changes and member monitoring
 
 bot = commands.Bot(command_prefix=get_prefix_for_bot, intents=intents)
 
@@ -30,10 +31,12 @@ COGS = [
     "cogs.odm",
     "cogs.profile",
     "cogs.arena",
-    "cogs.gifs",   # OwO-style AoT reaction GIF commands
-    "cogs.mikasa", # Mikasa Ackerman specific features
-    "cogs.games",  # Trivia, titan spawn, ODM training games
+    "cogs.gifs",      # OwO-style AoT reaction GIF commands
+    "cogs.mikasa",    # Mikasa Ackerman specific features
+    "cogs.games",     # Trivia, titan spawn, ODM training games
     "cogs.abilities", # Character abilities and titan transformations
+    "cogs.afk",       # AoT-themed AFK system
+    "cogs.automod",   # OpenRouter Gemma-4 AI auto-moderation
 ]
 
 
