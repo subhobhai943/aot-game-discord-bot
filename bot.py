@@ -1,6 +1,9 @@
 import os
 import sys
 import subprocess
+import shutil
+import urllib.request
+import tarfile
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -10,11 +13,12 @@ load_dotenv()
 
 
 def install_dependencies():
-    """Auto-install Python packages and ffmpeg-python at startup."""
+    """Auto-install missing Python packages at startup."""
     packages = ["yt-dlp", "PyNaCl"]
     for pkg in packages:
+        module = pkg.replace("-", "_").lower()
         try:
-            __import__(pkg.replace("-", "_").lower())
+            __import__(module)
         except ImportError:
             print(f"[Setup] Installing {pkg}...")
             subprocess.check_call([sys.executable, "-m", "pip", "install", pkg, "--quiet"])
@@ -22,36 +26,57 @@ def install_dependencies():
 
 
 def install_ffmpeg():
-    """Download and install static ffmpeg binary if not found."""
-    import shutil
+    """Auto-download static ffmpeg binary using Python only (no wget/tar CLI needed)."""
+    # Check if ffmpeg already exists in system PATH
     if shutil.which("ffmpeg"):
-        print("[Setup] ffmpeg already available.")
+        print("[Setup] ffmpeg already available in PATH.")
         return
 
-    ffmpeg_dir = os.path.join(os.path.expanduser("~"), "ffmpeg")
+    ffmpeg_dir = os.path.join(os.path.expanduser("~"), "ffmpeg_bin")
     ffmpeg_bin = os.path.join(ffmpeg_dir, "ffmpeg")
 
+    # Check if already downloaded before
     if os.path.isfile(ffmpeg_bin):
         os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
-        print("[Setup] ffmpeg found in ~/ffmpeg, added to PATH.")
+        print("[Setup] ffmpeg found in ~/ffmpeg_bin, added to PATH.")
         return
 
-    print("[Setup] ffmpeg not found. Downloading static binary...")
+    print("[Setup] ffmpeg not found. Downloading static binary (this may take ~30s)...")
     os.makedirs(ffmpeg_dir, exist_ok=True)
+
+    url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+    archive_path = os.path.join(ffmpeg_dir, "ffmpeg.tar.xz")
+
     try:
-        url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-        archive = os.path.join(ffmpeg_dir, "ffmpeg.tar.xz")
-        subprocess.check_call(["wget", "-q", "-O", archive, url])
-        subprocess.check_call(["tar", "-xf", archive, "-C", ffmpeg_dir, "--strip-components=1", "--wildcards", "*/ffmpeg"])
-        os.remove(archive)
+        # Download using Python urllib (no wget needed)
+        print("[Setup] Downloading ffmpeg...")
+        urllib.request.urlretrieve(url, archive_path)
+        print("[Setup] Download complete. Extracting...")
+
+        # Extract using Python tarfile module (no tar CLI needed)
+        with tarfile.open(archive_path, "r:xz") as tar:
+            for member in tar.getmembers():
+                # Only extract the ffmpeg binary file itself
+                if member.name.endswith("/ffmpeg") and member.isfile():
+                    member.name = "ffmpeg"  # flatten path
+                    tar.extract(member, ffmpeg_dir)
+                    break
+
+        os.remove(archive_path)
+
+        # Make it executable
+        os.chmod(ffmpeg_bin, 0o755)
+
+        # Add to PATH for this session
         os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
-        print("[Setup] ffmpeg installed successfully!")
+        print("[Setup] ffmpeg installed successfully at ~/ffmpeg_bin/ffmpeg!")
+
     except Exception as e:
-        print(f"[Setup] WARNING: Could not install ffmpeg automatically: {e}")
-        print("[Setup] Music commands may not work. Install ffmpeg manually.")
+        print(f"[Setup] WARNING: Could not auto-install ffmpeg: {e}")
+        print("[Setup] Music voice commands may not work.")
 
 
-# Run auto-setup before anything else
+# Run auto-setup before loading the bot
 install_dependencies()
 install_ffmpeg()
 
