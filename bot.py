@@ -12,22 +12,38 @@ from cogs.settings import get_prefix
 load_dotenv()
 
 
-def install_dependencies():
-    """Auto-install missing Python packages at startup."""
-    packages = ["yt-dlp", "PyNaCl"]
-    for pkg in packages:
-        module = pkg.replace("-", "_").lower()
+def install_system_deps():
+    """Install libsodium (needed by PyNaCl for voice) via apt if available."""
+    if shutil.which("apt-get"):
         try:
-            __import__(module)
-        except ImportError:
-            print(f"[Setup] Installing {pkg}...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", pkg, "--quiet"])
-            print(f"[Setup] {pkg} installed!")
+            print("[Setup] Installing libsodium via apt...")
+            subprocess.check_call(
+                ["apt-get", "install", "-y", "-q", "libsodium-dev", "ffmpeg"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+            print("[Setup] libsodium + ffmpeg installed via apt!")
+            return True
+        except Exception as e:
+            print(f"[Setup] apt install failed: {e}")
+    return False
 
 
-def install_ffmpeg():
-    """Auto-download static ffmpeg binary using Python only (no wget/tar CLI needed)."""
-    # Check if ffmpeg already exists in system PATH
+def install_python_deps():
+    """Reinstall PyNaCl and yt-dlp to make sure they are present."""
+    packages = ["PyNaCl", "yt-dlp"]
+    for pkg in packages:
+        try:
+            print(f"[Setup] Ensuring {pkg} is installed...")
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", pkg, "--quiet", "--upgrade"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+        except Exception as e:
+            print(f"[Setup] Warning: could not install {pkg}: {e}")
+
+
+def install_ffmpeg_fallback():
+    """Download static ffmpeg binary using Python only if apt did not provide it."""
     if shutil.which("ffmpeg"):
         print("[Setup] ffmpeg already available in PATH.")
         return
@@ -35,50 +51,36 @@ def install_ffmpeg():
     ffmpeg_dir = os.path.join(os.path.expanduser("~"), "ffmpeg_bin")
     ffmpeg_bin = os.path.join(ffmpeg_dir, "ffmpeg")
 
-    # Check if already downloaded before
     if os.path.isfile(ffmpeg_bin):
         os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
         print("[Setup] ffmpeg found in ~/ffmpeg_bin, added to PATH.")
         return
 
-    print("[Setup] ffmpeg not found. Downloading static binary (this may take ~30s)...")
+    print("[Setup] Downloading static ffmpeg binary...")
     os.makedirs(ffmpeg_dir, exist_ok=True)
-
     url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
     archive_path = os.path.join(ffmpeg_dir, "ffmpeg.tar.xz")
-
     try:
-        # Download using Python urllib (no wget needed)
-        print("[Setup] Downloading ffmpeg...")
         urllib.request.urlretrieve(url, archive_path)
-        print("[Setup] Download complete. Extracting...")
-
-        # Extract using Python tarfile module (no tar CLI needed)
         with tarfile.open(archive_path, "r:xz") as tar:
             for member in tar.getmembers():
-                # Only extract the ffmpeg binary file itself
                 if member.name.endswith("/ffmpeg") and member.isfile():
-                    member.name = "ffmpeg"  # flatten path
+                    member.name = "ffmpeg"
                     tar.extract(member, ffmpeg_dir)
                     break
-
         os.remove(archive_path)
-
-        # Make it executable
         os.chmod(ffmpeg_bin, 0o755)
-
-        # Add to PATH for this session
         os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
-        print("[Setup] ffmpeg installed successfully at ~/ffmpeg_bin/ffmpeg!")
-
+        print("[Setup] ffmpeg installed at ~/ffmpeg_bin/ffmpeg!")
     except Exception as e:
-        print(f"[Setup] WARNING: Could not auto-install ffmpeg: {e}")
-        print("[Setup] Music voice commands may not work.")
+        print(f"[Setup] WARNING: ffmpeg fallback download failed: {e}")
 
 
-# Run auto-setup before loading the bot
-install_dependencies()
-install_ffmpeg()
+# --- Run all setup steps before loading the bot ---
+apt_success = install_system_deps()
+install_python_deps()
+if not apt_success:
+    install_ffmpeg_fallback()
 
 
 def get_prefix_for_bot(bot, message):
@@ -109,7 +111,7 @@ COGS = [
     "cogs.abilities",
     "cogs.afk",
     "cogs.automod",
-    "cogs.music",     # Music player — YouTube, Spotify search, ping
+    "cogs.music",
 ]
 
 
