@@ -37,6 +37,7 @@ COGS = [
     "cogs.abilities", # Character abilities and titan transformations
     "cogs.afk",       # AoT-themed AFK system
     "cogs.automod",   # OpenRouter Gemma-4 AI auto-moderation
+    "cogs.music",     # Music player — YouTube, Spotify search, ping
 ]
 
 
