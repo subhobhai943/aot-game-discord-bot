@@ -12,11 +12,27 @@ from cogs.settings import get_prefix
 load_dotenv()
 
 
+def install_all_requirements():
+    """Install everything from requirements.txt at startup."""
+    req_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "requirements.txt")
+    if not os.path.isfile(req_file):
+        print("[Setup] requirements.txt not found, skipping.")
+        return
+    print("[Setup] Installing all packages from requirements.txt...")
+    try:
+        subprocess.check_call(
+            [sys.executable, "-m", "pip", "install", "-r", req_file, "--quiet"],
+        )
+        print("[Setup] All requirements installed!")
+    except Exception as e:
+        print(f"[Setup] Warning: some packages failed to install: {e}")
+
+
 def install_system_deps():
-    """Install libsodium (needed by PyNaCl for voice) via apt if available."""
+    """Install libsodium + ffmpeg via apt if available."""
     if shutil.which("apt-get"):
         try:
-            print("[Setup] Installing libsodium via apt...")
+            print("[Setup] Installing libsodium + ffmpeg via apt...")
             subprocess.check_call(
                 ["apt-get", "install", "-y", "-q", "libsodium-dev", "ffmpeg"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
@@ -26,20 +42,6 @@ def install_system_deps():
         except Exception as e:
             print(f"[Setup] apt install failed: {e}")
     return False
-
-
-def install_python_deps():
-    """Reinstall PyNaCl and yt-dlp to make sure they are present."""
-    packages = ["PyNaCl", "yt-dlp"]
-    for pkg in packages:
-        try:
-            print(f"[Setup] Ensuring {pkg} is installed...")
-            subprocess.check_call(
-                [sys.executable, "-m", "pip", "install", pkg, "--quiet", "--upgrade"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-        except Exception as e:
-            print(f"[Setup] Warning: could not install {pkg}: {e}")
 
 
 def install_ffmpeg_fallback():
@@ -78,7 +80,7 @@ def install_ffmpeg_fallback():
 
 # --- Run all setup steps before loading the bot ---
 apt_success = install_system_deps()
-install_python_deps()
+install_all_requirements()   # installs aot-toolkit, Pillow, PyNaCl, yt-dlp, etc.
 if not apt_success:
     install_ffmpeg_fallback()
 
