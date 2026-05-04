@@ -6,6 +6,7 @@ from utils.gifs import get_gif
 from utils.game_state import GameState, RANKS
 import hashlib
 import random
+from datetime import date
 
 # ── Protected user: Mikasa Ackerman (cannot be banned) ────────────────
 MIKASA_USER_ID = 1380905001584431256
@@ -20,13 +21,14 @@ MIKASA_BAN_RESPONSES = [
 ]
 
 
-def _stable_hash(a: int, b: int) -> int:
+def _daily_hash(a: int, b: int) -> int:
     """
-    Returns a stable 1-100 score for two user IDs.
-    Uses SHA-256 so it's always positive, consistent across Python versions,
-    and produces the same result regardless of argument order.
+    Returns a daily-changing 1-100 score for two user IDs.
+    Uses SHA-256 with today's date included in the key so the score
+    stays consistent within the same day but changes every new day.
     """
-    key = str(min(a, b)) + ":" + str(max(a, b))
+    today = date.today().isoformat()  # e.g. "2026-05-04"
+    key = today + ":" + str(min(a, b)) + ":" + str(max(a, b))
     digest = hashlib.sha256(key.encode()).hexdigest()
     return (int(digest[:8], 16) % 100) + 1  # always 1-100
 
@@ -101,7 +103,7 @@ class Mikasa(commands.Cog):
             )
             return
 
-        score = _stable_hash(user1.id, user2.id)
+        score = _daily_hash(user1.id, user2.id)
         # Build ship name: first half of name1 + second half of name2
         n1 = user1.display_name
         n2 = user2.display_name
@@ -178,7 +180,7 @@ class Mikasa(commands.Cog):
                 )
             )
             return
-        score = _stable_hash(user1.id, user2.id)
+        score = _daily_hash(user1.id, user2.id)
         n1, n2 = user1.display_name, user2.display_name
         ship_name = n1[:max(1, len(n1) // 2)] + n2[max(0, len(n2) // 2):]
         filled = score // 10
@@ -210,8 +212,8 @@ class Mikasa(commands.Cog):
     async def ackerman_bond(self, interaction: discord.Interaction, user: discord.Member):
         """Calculate an Ackerman bond score — always 1-100, consistent, never breaks."""
         author = interaction.user
-        # Use SHA-256 stable hash — always 1-100, never negative
-        combined = _stable_hash(author.id, user.id)
+        # Use daily hash — changes each day
+        combined = _daily_hash(author.id, user.id)
 
         if combined >= 90:
             rating = "🔥 Soulmates! Eternal Devotion! 🔥"
@@ -248,7 +250,7 @@ class Mikasa(commands.Cog):
             inline=True
         )
         embed.set_thumbnail(url=author.display_avatar.url)
-        embed.set_footer(text="Eren… for all these years, I’ve liked you.")
+        embed.set_footer(text="Eren… for all these years, I've liked you.")
         await interaction.response.send_message(embed=embed)
 
     # ── /mikasa slash command ───────────────────────────────────────────
@@ -337,7 +339,7 @@ class Mikasa(commands.Cog):
         embed.add_field(name="Kills (Estimated)", value="100+ Titans", inline=True)
         embed.add_field(name="Status", value="Active - Protecting Paradis", inline=True)
         embed.set_thumbnail(url="https://static.wikia.nocookie.net/shingekinokyojin/images/3/37/Mikasa_Ackerman.png/revision/latest/scale-to-width-down/400")
-        embed.set_footer(text="🧩 Wings of Freedom | Eren… I’ve always been with you.")
+        embed.set_footer(text="🧩 Wings of Freedom | Eren… I've always been with you.")
         await interaction.response.send_message(embed=embed)
 
     # ── Prefix commands ─────────────────────────────────────────────────
