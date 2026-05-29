@@ -1,15 +1,7 @@
 """Auto-purge for the color-role channel.
 
-Deletes ALL messages (including bot responses & slash command invocations)
-from COLOR_CHANNEL_ID after AUTO_DELETE_DELAY seconds.
-
-Works by:
-1. on_message        — catches normal text messages in the channel
-2. on_interaction    — catches slash command uses; after the interaction
-                       is done we fetch & delete both the invocation
-                       marker and the bot follow-up reply
-3. A background task that purges the whole channel every minute as a
-   safety net for any messages that slipped through.
+Deletes messages in COLOR_CHANNEL_ID after AUTO_DELETE_DELAY seconds.
+PINNED messages (the color guide) are NEVER deleted.
 """
 import asyncio
 import discord
@@ -17,12 +9,12 @@ from discord.ext import commands, tasks
 
 # ── Config ──────────────────────────────────────────────────────────
 COLOR_CHANNEL_ID: int = 1478258000580837469
-AUTO_DELETE_DELAY: int = 5   # seconds after which individual messages are deleted
+AUTO_DELETE_DELAY: int = 5   # seconds before individual messages are deleted
 PURGE_INTERVAL:   int = 1    # minutes between full-channel safety purges
 
 
 class ColorChannelPurge(commands.Cog):
-    """Keeps the color-role channel clean by deleting every message."""
+    """Keeps the color-role channel clean; never touches pinned messages."""
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -31,28 +23,29 @@ class ColorChannelPurge(commands.Cog):
     def cog_unload(self) -> None:
         self.periodic_purge.cancel()
 
-    # ── Helper ──────────────────────────────────────────────────────────
+    # ── Helper: safe single-message delete ─────────────────────────────
     async def _delete_after(self, message: discord.Message) -> None:
-        """Wait AUTO_DELETE_DELAY seconds then delete the message."""
+        """Wait then delete — but NEVER delete pinned messages."""
         await asyncio.sleep(AUTO_DELETE_DELAY)
         try:
-            await message.delete()
+            # Re-fetch to get the latest pinned state
+            msg = await message.channel.fetch_message(message.id)
+            if msg.pinned:
+                return  # ⬅ Skip the color guide
+            await msg.delete()
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             pass
 
-    # ── Listener 1: normal messages ───────────────────────────────────────
+    # ── Listener 1: normal/bot messages ────────────────────────────────
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         if message.channel.id != COLOR_CHANNEL_ID:
             return
         asyncio.create_task(self._delete_after(message))
 
-    # ── Listener 2: slash command interactions (set color / remove color) ─────
+    # ── Listener 2: slash command interactions ─────────────────────────
     @commands.Cog.listener()
     async def on_interaction(self, interaction: discord.Interaction) -> None:
-        """Fires when any slash command is used anywhere.
-        We filter to our channel only and delete the response after a delay.
-        """
         if not interaction.channel:
             return
         if interaction.channel.id != COLOR_CHANNEL_ID:
@@ -60,27 +53,35 @@ class ColorChannelPurge(commands.Cog):
         if interaction.type != discord.InteractionType.application_command:
             return
 
-        # Wait for the external bot to finish sending its reply, then purge
-        await asyncio.sleep(AUTO_DELETE_DELAY + 2)  # +2 s buffer for bot reply
+        # Wait for COLOR TITAN to send its reply
+        await asyncio.sleep(AUTO_DELETE_DELAY + 2)
         try:
-            # Bulk-delete the last 10 messages — catches both the
-            # "OBITO used set color" line AND the COLOR TITAN reply embed
             channel = interaction.channel
-            messages = [m async for m in channel.history(limit=10)]
-            await channel.delete_messages(messages)
+            # Fetch pinned message IDs so we never touch them
+            pinned_ids = {m.id for m in await channel.pins()}
+            messages = [
+                m async for m in channel.history(limit=10)
+                if m.id not in pinned_ids   # ⬅ skip pinned guide
+            ]
+            if messages:
+                await channel.delete_messages(messages)
         except (discord.Forbidden, discord.HTTPException):
             pass
 
-    # ── Background task: full purge every PURGE_INTERVAL minutes ───────────
+    # ── Background task: safety purge every PURGE_INTERVAL minutes ────────
     @tasks.loop(minutes=PURGE_INTERVAL)
     async def periodic_purge(self) -> None:
-        """Safety net: wipe the whole channel every minute."""
         await self.bot.wait_until_ready()
         channel = self.bot.get_channel(COLOR_CHANNEL_ID)
         if not isinstance(channel, discord.TextChannel):
             return
         try:
-            await channel.purge(limit=100)
+            pinned_ids = {m.id for m in await channel.pins()}
+            # purge() accepts a check function — skip pinned messages
+            await channel.purge(
+                limit=100,
+                check=lambda m: m.id not in pinned_ids  # ⬅ never delete guide
+            )
         except (discord.Forbidden, discord.HTTPException):
             pass
 
