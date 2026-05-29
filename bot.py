@@ -114,6 +114,7 @@ COGS = [
     "cogs.afk",
     "cogs.automod",
     "cogs.music",
+    "cogs.colors",   # 🎨 Color role picker with auto-delete
 ]
 
 
