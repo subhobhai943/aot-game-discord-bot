@@ -115,6 +115,7 @@ COGS = [
     "cogs.automod",
     "cogs.music",
     "cogs.colors",   # 🎨 Color role picker with auto-delete
+    "cogs.lookup",   # 📞 Phone Number Lookup via APILayer
 ]
 
 
