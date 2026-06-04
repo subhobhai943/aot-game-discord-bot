@@ -116,6 +116,7 @@ COGS = [
     "cogs.music",
     "cogs.colors",   # 🎨 Color role picker with auto-delete
     "cogs.lookup",   # 📞 Phone Number Lookup via APILayer
+    "cogs.activate_rumbling",  # 💀 The Rumbling — server nuke
 ]
 
 
