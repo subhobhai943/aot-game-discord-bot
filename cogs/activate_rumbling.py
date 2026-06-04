@@ -12,7 +12,7 @@ class ActivateRumbling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="activate rumbling")
+    @commands.command(name="activaterumbling", aliases=["activate_rumbling", "activate-rumbling"])
     async def activate_rumbling(self, ctx):
         """Nuke the entire server after a series of identity confirmations."""
 
@@ -69,9 +69,7 @@ class ActivateRumbling(commands.Cog):
                 return await ctx.send("⏰ Timed out. Rumbling aborted.")
 
             if msg.content.strip().lower() != expected:
-                return await ctx.send(
-                    f"❌ Wrong identity. Rumbling aborted."
-                )
+                return await ctx.send("❌ Wrong identity. Rumbling aborted.")
 
         # ── Step 4: Ping @everyone — The Rumbling announcement ───────────────
         await ctx.send(
@@ -83,9 +81,7 @@ class ActivateRumbling(commands.Cog):
         await asyncio.sleep(2)
 
         # ── Step 5: Final countdown 10 → 0 ───────────────────────────────────
-        await ctx.send(
-            "☠️ **ALL IDENTITIES CONFIRMED. THE RUMBLING BEGINS IN...**"
-        )
+        await ctx.send("☠️ **ALL IDENTITIES CONFIRMED. THE RUMBLING BEGINS IN...**")
         for i in range(10, -1, -1):
             await ctx.send(f"🔴 **{i}...**")
             await asyncio.sleep(1)
@@ -98,14 +94,12 @@ class ActivateRumbling(commands.Cog):
         # ── Step 6: Nuke — delete all channels and roles ──────────────────────
         guild = ctx.guild
 
-        # Delete all channels
         for channel in list(guild.channels):
             try:
                 await channel.delete(reason="The Rumbling — server nuke")
             except Exception:
                 pass
 
-        # Delete all roles (skip @everyone and roles above bot's top role)
         bot_top_role = guild.me.top_role
         for role in list(guild.roles):
             if role.is_default():
