@@ -13,7 +13,6 @@ load_dotenv()
 
 
 def install_all_requirements():
-    """Install everything from requirements.txt at startup."""
     req_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "requirements.txt")
     if not os.path.isfile(req_file):
         print("[Setup] requirements.txt not found, skipping.")
@@ -29,7 +28,6 @@ def install_all_requirements():
 
 
 def install_system_deps():
-    """Install libsodium + ffmpeg via apt if available."""
     if shutil.which("apt-get"):
         try:
             print("[Setup] Installing libsodium + ffmpeg via apt...")
@@ -45,7 +43,6 @@ def install_system_deps():
 
 
 def install_ffmpeg_fallback():
-    """Download static ffmpeg binary using Python only if apt did not provide it."""
     if shutil.which("ffmpeg"):
         print("[Setup] ffmpeg already available in PATH.")
         return
@@ -78,15 +75,13 @@ def install_ffmpeg_fallback():
         print(f"[Setup] WARNING: ffmpeg fallback download failed: {e}")
 
 
-# --- Run all setup steps before loading the bot ---
 apt_success = install_system_deps()
-install_all_requirements()   # installs aot-toolkit, Pillow, PyNaCl, yt-dlp, etc.
+install_all_requirements()
 if not apt_success:
     install_ffmpeg_fallback()
 
 
 def get_prefix_for_bot(bot, message):
-    """Dynamic prefix per server."""
     if message.guild:
         p = get_prefix(message.guild.id)
         return [p + " ", p]
@@ -96,6 +91,7 @@ def get_prefix_for_bot(bot, message):
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.reactions = True
 
 bot = commands.Bot(command_prefix=get_prefix_for_bot, intents=intents)
 
@@ -114,9 +110,13 @@ COGS = [
     "cogs.afk",
     "cogs.automod",
     "cogs.music",
-    "cogs.colors",   # 🎨 Color role picker with auto-delete
-    "cogs.lookup",   # 📞 Phone Number Lookup via APILayer
-    "cogs.activate_rumbling",  # 💀 The Rumbling — server nuke
+    "cogs.colors",
+    "cogs.lookup",
+    "cogs.activate_rumbling",
+    # ── New game system ──
+    "cogs.titan_catch",    # 👹 OwO-style spawn + catch + collection
+    "cogs.pvp",            # ⚔️  Player vs Player titan battles
+    "cogs.leaderboard",    # 🏆 Rankings and leaderboards
 ]
 
 
