@@ -6,24 +6,25 @@ import random
 from utils.game_state import GameState, TITANS, CHARACTERS
 from utils.gifs import get_gif
 
-# ── Titan Images (static Wikia CDN — always available) ──────────────────────
+# ── Titan Images — hosted in repo assets/Titans/ ───────────────────────────
+# raw.githubusercontent.com is 100% Discord-embed compatible
+_RAW = "https://raw.githubusercontent.com/subhobhai943/aot-game-discord-bot/main/assets/Titans"
+
 TITAN_IMAGES = {
-    "Pure Titan":       "https://static.wikia.nocookie.net/attackontitan/images/1/18/Titans_charging.png",
-    "Abnormal Titan":   "https://static.wikia.nocookie.net/attackontitan/images/2/2e/Abnormal_titan_anime.png",
-    "Jaw Titan":        "https://static.wikia.nocookie.net/attackontitan/images/6/6e/Jaw_Titan_%28Falco%29_full_body.png",
-    "Cart Titan":       "https://static.wikia.nocookie.net/attackontitan/images/4/45/Cart_Titan_full_appearance.png",
-    "Female Titan":     "https://static.wikia.nocookie.net/attackontitan/images/a/a9/Annie_Leonhart%27s_Titan_full_body.png",
-    "Armored Titan":    "https://static.wikia.nocookie.net/attackontitan/images/3/30/Armored_Titan_full_appearance_%28anime%29.png",
-    "Attack Titan":     "https://static.wikia.nocookie.net/attackontitan/images/8/85/Eren%27s_Attack_Titan_full_appearance.png",
-    "Colossal Titan":   "https://static.wikia.nocookie.net/attackontitan/images/a/a5/Colossal_Titan_anime_full.png",
-    "Beast Titan":      "https://static.wikia.nocookie.net/attackontitan/images/3/35/Zeke%27s_Beast_Titan_full_body.png",
-    "War Hammer Titan": "https://static.wikia.nocookie.net/attackontitan/images/d/d3/War_Hammer_Titan_full_appearance.png",
-    "Founding Titan":   "https://static.wikia.nocookie.net/attackontitan/images/7/73/Founding_Titan_full_body_%28anime%29.png",
+    "Pure Titan":       f"{_RAW}/pure_titan.jpg",
+    "Abnormal Titan":   f"{_RAW}/abnormal_titan.jpg",
+    "Jaw Titan":        f"{_RAW}/jaw_titan.jpg",
+    "Cart Titan":       f"{_RAW}/cart_titan.jpg",
+    "Female Titan":     f"{_RAW}/female_titan.jpg",
+    "Armored Titan":    f"{_RAW}/armored_titan.jpg",
+    "Attack Titan":     f"{_RAW}/attack_titan.jpg",
+    "Colossal Titan":   f"{_RAW}/colossal_titan.jpg",
+    "Beast Titan":      f"{_RAW}/beast_titan.jpg",
+    "War Hammer Titan": f"{_RAW}/war_hammer_titan.jpg",
+    "Founding Titan":   f"{_RAW}/founding_titan.jpg",
 }
 
-# Fallback banner used in general embeds (Survey Corps charging)
-AOT_BANNER = "https://static.wikia.nocookie.net/attackontitan/images/2/2e/Wall_Sina%2C_Goodbye_visual.png"
-SURVEY_CORPS_ICON = "https://static.wikia.nocookie.net/attackontitan/images/9/9e/Survey_Corps_logo.png"
+SURVEY_CORPS_ICON = f"{_RAW}/survey_corps.png"
 
 # AoT Trivia Questions
 TRIVIA_QUESTIONS = [
@@ -123,16 +124,13 @@ class Games(commands.Cog):
 
     @app_commands.command(name="trivia", description="Play an Attack on Titan trivia game!")
     async def trivia(self, interaction: discord.Interaction):
-        """Start a new AoT trivia round."""
         q = random.choice(TRIVIA_QUESTIONS)
-
         options = q["options"]
         letters = ["🇦", "🇧", "🇨", "🇩"]
 
         embed = discord.Embed(
             title="📖 AoT Trivia Challenge",
-            description=f"**{q['question']}**\n\n"
-                        + "\n".join(f"{letters[i]} {options[i]}" for i in range(4)),
+            description=f"**{q['question']}**\n\n" + "\n".join(f"{letters[i]} {options[i]}" for i in range(4)),
             color=discord.Color.gold()
         )
         embed.set_thumbnail(url=q.get("image", SURVEY_CORPS_ICON))
@@ -140,7 +138,6 @@ class Games(commands.Cog):
 
         msg = await interaction.response.send_message(embed=embed)
         msg = await interaction.original_response()
-
         for letter in letters:
             await msg.add_reaction(letter)
 
@@ -155,13 +152,8 @@ class Games(commands.Cog):
 
     # ── Titan Spawn Simulator ──────────────────────────────────────────────────
 
-    @app_commands.command(
-        name="spawn_titan",
-        description="Simulate a Titan spawning in the wasteland!"
-    )
+    @app_commands.command(name="spawn_titan", description="Simulate a Titan spawning in the wasteland!")
     async def spawn_titan(self, interaction: discord.Interaction):
-        """Roll for a random Titan spawn with rarity and description."""
-
         items = list(TITAN_SPAWN_DATA.items())
         names = [item[0] for item in items]
         weights = [item[1]["weight"] for item in items]
@@ -176,26 +168,20 @@ class Games(commands.Cog):
             "Epic":      discord.Color.purple(),
             "Legendary": discord.Color.gold(),
         }
-
         rarity_emojis = {
-            "Common":    "⬜",
-            "Uncommon":  "🟢",
-            "Rare":      "🔵",
-            "Epic":      "🟣",
-            "Legendary": "🟡",
+            "Common": "⬜", "Uncommon": "🟢", "Rare": "🔵", "Epic": "🟣", "Legendary": "🟡",
         }
 
         embed = discord.Embed(
             title="👹 TITAN SPOTTED!",
-            description=f"🚨 *A terrifying presence appears on the horizon...*",
+            description="🚨 *A terrifying presence appears on the horizon...*",
             color=rarity_colors.get(data["rarity"], discord.Color.red())
         )
-        embed.add_field(name="👾 Type",     value=f"**{result}**",              inline=True)
-        embed.add_field(name="⭐ Rarity",   value=f"{rarity_emojis.get(data['rarity'], '')} {data['rarity']}", inline=True)
-        embed.add_field(name="\u200b",        value="\u200b",                       inline=True)
-        embed.add_field(name="📜 Description", value=data["description"],         inline=False)
+        embed.add_field(name="👾 Type",        value=f"**{result}**", inline=True)
+        embed.add_field(name="⭐ Rarity",      value=f"{rarity_emojis.get(data['rarity'], '')} {data['rarity']}", inline=True)
+        embed.add_field(name="\u200b",           value="\u200b", inline=True)
+        embed.add_field(name="📜 Description", value=data["description"], inline=False)
 
-        # Set the titan image
         titan_img = TITAN_IMAGES.get(result)
         if titan_img:
             embed.set_image(url=titan_img)
@@ -211,10 +197,7 @@ class Games(commands.Cog):
 
     # ── ODM Gear Training ─────────────────────────────────────────────────────
 
-    @app_commands.command(
-        name="odm_training",
-        description="Test your ODM gear skills with a training simulation!"
-    )
+    @app_commands.command(name="odm_training", description="Test your ODM gear skills with a training simulation!")
     @app_commands.describe(difficulty="Training difficulty level")
     @app_commands.choices(difficulty=[
         app_commands.Choice(name="Beginner",     value="easy"),
@@ -222,29 +205,19 @@ class Games(commands.Cog):
         app_commands.Choice(name="Elite",        value="hard"),
     ])
     async def odm_training(self, interaction: discord.Interaction, difficulty: str = "medium"):
-        """Complete an ODM gear obstacle course simulation."""
-
         difficulties = {
             "easy":   {"obstacles": 5,  "success_rate": 0.90, "name": "Beginner"},
             "medium": {"obstacles": 8,  "success_rate": 0.75, "name": "Intermediate"},
             "hard":   {"obstacles": 12, "success_rate": 0.55, "name": "Elite"},
         }
-
         d = difficulties[difficulty]
         results = []
         score = 0
-
         obstacle_types = [
-            "Tight urban passage",
-            "Building grapple swing",
-            "High-speed descent",
-            "Nape strike practice",
-            "Gas conservation run",
-            "Blade durability test",
-            "Emergency evasion",
-            "Multi-target lock",
+            "Tight urban passage", "Building grapple swing", "High-speed descent",
+            "Nape strike practice", "Gas conservation run", "Blade durability test",
+            "Emergency evasion", "Multi-target lock",
         ]
-
         for i in range(d["obstacles"]):
             obstacle = obstacle_types[i % len(obstacle_types)]
             success = random.random() < d["success_rate"]
@@ -257,35 +230,24 @@ class Games(commands.Cog):
         percentage = int((score / d["obstacles"]) * 100)
 
         if percentage >= 90:
-            grade = "S Rank! 🏆"
-            grade_emoji = "👑"
-            color = discord.Color.gold()
+            grade, grade_emoji, color = "S Rank! 🏆", "👑", discord.Color.gold()
             banner = TITAN_IMAGES["Colossal Titan"]
         elif percentage >= 80:
-            grade = "A Rank!"
-            grade_emoji = "⚡"
-            color = discord.Color.green()
+            grade, grade_emoji, color = "A Rank!", "⚡", discord.Color.green()
             banner = TITAN_IMAGES["Armored Titan"]
         elif percentage >= 60:
-            grade = "B Rank!"
-            grade_emoji = "✅"
-            color = discord.Color.teal()
+            grade, grade_emoji, color = "B Rank!", "✅", discord.Color.teal()
             banner = TITAN_IMAGES["Female Titan"]
         elif percentage >= 40:
-            grade = "C Rank!"
-            grade_emoji = "📜"
-            color = discord.Color.orange()
+            grade, grade_emoji, color = "C Rank!", "📜", discord.Color.orange()
             banner = TITAN_IMAGES["Jaw Titan"]
         else:
-            grade = "D Rank! 💀"
-            grade_emoji = "💀"
-            color = discord.Color.red()
+            grade, grade_emoji, color = "D Rank! 💀", "💀", discord.Color.red()
             banner = TITAN_IMAGES["Pure Titan"]
 
         embed = discord.Embed(
             title=f"🪂 ODM Gear Training — {d['name']} Course",
-            description=f"{grade_emoji} **Final Grade: {grade}** ({percentage}%)\n"
-                        f"**Score:** {score}/{d['obstacles']} obstacles cleared\n",
+            description=f"{grade_emoji} **Final Grade: {grade}** ({percentage}%)\n**Score:** {score}/{d['obstacles']} obstacles cleared",
             color=color
         )
         embed.set_thumbnail(url=SURVEY_CORPS_ICON)
@@ -305,23 +267,19 @@ class Games(commands.Cog):
 
         embed.add_field(name="🔖 New Level", value=f"Level {player.level} ({player.xp}/{player.xp_needed} XP)", inline=True)
         embed.set_footer(text="Remember: Speed is everything in ODM combat!")
-
         await interaction.response.send_message(embed=embed)
 
-    # ── Daily Challenge ─────────────────────────────────────────────────────────────
+    # ── Daily Challenge ────────────────────────────────────────────────────────────
 
     @app_commands.command(name="daily_challenge", description="Get today's AoT daily challenge!")
     async def daily_challenge(self, interaction: discord.Interaction):
-        """Get a random daily challenge for bonus XP."""
-
         challenges = [
-            {"title": "Titan Slayer",  "desc": "Win a battle against any titan",             "reward": 50,  "image": TITAN_IMAGES["Pure Titan"]},
-            {"title": "Lore Master",   "desc": "Look up 3 different characters",              "reward": 30,  "image": SURVEY_CORPS_ICON},
-            {"title": "ODM Expert",    "desc": "Complete an ODM training course",             "reward": 40,  "image": SURVEY_CORPS_ICON},
-            {"title": "Team Player",   "desc": "React to another player's message with a gif","reward": 20,  "image": SURVEY_CORPS_ICON},
-            {"title": "Scout Elite",   "desc": "Reach a new rank level",                      "reward": 100, "image": TITAN_IMAGES["Beast Titan"]},
+            {"title": "Titan Slayer",  "desc": "Win a battle against any titan",              "reward": 50,  "image": TITAN_IMAGES["Pure Titan"]},
+            {"title": "Lore Master",   "desc": "Look up 3 different characters",               "reward": 30,  "image": SURVEY_CORPS_ICON},
+            {"title": "ODM Expert",    "desc": "Complete an ODM training course",              "reward": 40,  "image": SURVEY_CORPS_ICON},
+            {"title": "Team Player",   "desc": "React to another player's message with a gif", "reward": 20,  "image": SURVEY_CORPS_ICON},
+            {"title": "Scout Elite",   "desc": "Reach a new rank level",                       "reward": 100, "image": TITAN_IMAGES["Beast Titan"]},
         ]
-
         challenge = random.choice(challenges)
 
         embed = discord.Embed(
@@ -331,7 +289,7 @@ class Games(commands.Cog):
         )
         embed.set_thumbnail(url=challenge["image"])
         embed.add_field(name="🎁 Reward",     value=f"{challenge['reward']} XP", inline=True)
-        embed.add_field(name="⏱️ Time Limit", value="24 hours",               inline=True)
+        embed.add_field(name="⏱️ Time Limit", value="24 hours",                inline=True)
         embed.set_footer(text="Complete challenges for bonus XP!")
 
         if random.random() < 0.3:
@@ -341,34 +299,30 @@ class Games(commands.Cog):
                 value=f"**{q['question']}**\n*(Answer: {q['options'][q['answer']]}) — {q['explanation']}*",
                 inline=False
             )
-
         await interaction.response.send_message(embed=embed)
 
-    # ── Random Fact Command ───────────────────────────────────────────────────────────
+    # ── Random Fact ───────────────────────────────────────────────────────────────
 
     @app_commands.command(name="aot_fact", description="Get a random Attack on Titan fact!")
     async def aot_fact(self, interaction: discord.Interaction):
-        """Display a random AoT fact with a matching titan image."""
-
         facts = [
-            {"text": "Eren's Titan form is 15 meters tall, the same height as the Attack Titan.",                                      "image": TITAN_IMAGES["Attack Titan"]},
-            {"text": "Mikasa's scarf is made from the same material as the Scout Regiment cloaks.",                                    "image": SURVEY_CORPS_ICON},
-            {"text": "The Founding Titan can alter or erase the memories of Subjects of Ymir.",                                        "image": TITAN_IMAGES["Founding Titan"]},
-            {"text": "Levi's cleaning obsession is so strong he once threatened to break Eren's legs for dirtying the room.",           "image": SURVEY_CORPS_ICON},
-            {"text": "The Colossal Titan can emit steam at will, using it as both offense and defense.",                               "image": TITAN_IMAGES["Colossal Titan"]},
-            {"text": "Armin's strategic mind was recognized even by Erwin Smith, who trusted him with crucial plans.",                 "image": TITAN_IMAGES["Colossal Titan"]},
-            {"text": "Reiner's 'Warrior' persona was a coping mechanism for his years of living as a double agent.",                  "image": TITAN_IMAGES["Armored Titan"]},
-            {"text": "The Beast Titan's ability to throw objects with precision is unmatched by any other Titan.",                     "image": TITAN_IMAGES["Beast Titan"]},
-            {"text": "Historia Reiss was willing to sacrifice herself to save Eren and humanity.",                                      "image": TITAN_IMAGES["Founding Titan"]},
-            {"text": "Hange Zoë's passion for Titan research led to numerous breakthroughs in Titan biology.",                         "image": SURVEY_CORPS_ICON},
-            {"text": "The War Hammer Titan can create structures and weapons from hardened crystal.",                                   "image": TITAN_IMAGES["War Hammer Titan"]},
-            {"text": "Ymir Fritz's connection to the Founding Titan spans over 2,000 years of history.",                              "image": TITAN_IMAGES["Founding Titan"]},
-            {"text": "The Attack Titan can see memories of future inheritors, creating visions of what's to come.",                   "image": TITAN_IMAGES["Attack Titan"]},
-            {"text": "Annie Leonhart's crystal hardening ability can preserve her Titan form indefinitely.",                           "image": TITAN_IMAGES["Female Titan"]},
-            {"text": "The Cart Titan's endurance allowed its inheritor to maintain Titan form for months.",                           "image": TITAN_IMAGES["Cart Titan"]},
-            {"text": "The Jaw Titan is the fastest of all Nine Titans due to its small size and agile claws.",                        "image": TITAN_IMAGES["Jaw Titan"]},
+            {"text": "Eren's Titan form is 15 meters tall, the same height as the Attack Titan.",                                   "image": TITAN_IMAGES["Attack Titan"]},
+            {"text": "Mikasa's scarf is made from the same material as the Scout Regiment cloaks.",                                 "image": SURVEY_CORPS_ICON},
+            {"text": "The Founding Titan can alter or erase the memories of Subjects of Ymir.",                                     "image": TITAN_IMAGES["Founding Titan"]},
+            {"text": "Levi's cleaning obsession is so strong he once threatened to break Eren's legs for dirtying the room.",        "image": SURVEY_CORPS_ICON},
+            {"text": "The Colossal Titan can emit steam at will, using it as both offense and defense.",                            "image": TITAN_IMAGES["Colossal Titan"]},
+            {"text": "Armin's strategic mind was recognized even by Erwin Smith, who trusted him with crucial plans.",              "image": TITAN_IMAGES["Colossal Titan"]},
+            {"text": "Reiner's 'Warrior' persona was a coping mechanism for his years of living as a double agent.",               "image": TITAN_IMAGES["Armored Titan"]},
+            {"text": "The Beast Titan's ability to throw objects with precision is unmatched by any other Titan.",                  "image": TITAN_IMAGES["Beast Titan"]},
+            {"text": "Historia Reiss was willing to sacrifice herself to save Eren and humanity.",                                   "image": TITAN_IMAGES["Founding Titan"]},
+            {"text": "Hange Zoë's passion for Titan research led to numerous breakthroughs in Titan biology.",                      "image": SURVEY_CORPS_ICON},
+            {"text": "The War Hammer Titan can create structures and weapons from hardened crystal.",                                "image": TITAN_IMAGES["War Hammer Titan"]},
+            {"text": "Ymir Fritz's connection to the Founding Titan spans over 2,000 years of history.",                           "image": TITAN_IMAGES["Founding Titan"]},
+            {"text": "The Attack Titan can see memories of future inheritors, creating visions of what's to come.",                "image": TITAN_IMAGES["Attack Titan"]},
+            {"text": "Annie Leonhart's crystal hardening ability can preserve her Titan form indefinitely.",                        "image": TITAN_IMAGES["Female Titan"]},
+            {"text": "The Cart Titan's endurance allowed its inheritor to maintain Titan form for months.",                        "image": TITAN_IMAGES["Cart Titan"]},
+            {"text": "The Jaw Titan is the fastest of all Nine Titans due to its small size and agile claws.",                     "image": TITAN_IMAGES["Jaw Titan"]},
         ]
-
         fact = random.choice(facts)
 
         embed = discord.Embed(
@@ -378,7 +332,6 @@ class Games(commands.Cog):
         )
         embed.set_thumbnail(url=fact["image"])
         embed.set_footer(text="🧩 The mystery of the Titans continues...")
-
         await interaction.response.send_message(embed=embed)
 
 
