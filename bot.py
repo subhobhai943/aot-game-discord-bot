@@ -98,7 +98,7 @@ bot = commands.Bot(command_prefix=get_prefix_for_bot, intents=intents)
 COGS = [
     "cogs.settings",
     "cogs.help",
-    "cogs.battle",
+    "cogs.battle",        # fixed: no longer imports aot.core.database (broken dep)
     "cogs.lore",
     "cogs.odm",
     "cogs.profile",
@@ -113,10 +113,11 @@ COGS = [
     "cogs.colors",
     "cogs.lookup",
     "cogs.activate_rumbling",
-    # ── New game system ──
+    # ── Game system ──
     "cogs.titan_catch",    # 👹 OwO-style spawn + catch + collection
     "cogs.pvp",            # ⚔️  Player vs Player titan battles
     "cogs.leaderboard",    # 🏆 Rankings and leaderboards
+    "cogs.owogames",       # 🎮 OwO-style mini-games (flip/dice/slots/8ball/rps/scramble/guess)
 ]
 
 
