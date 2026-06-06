@@ -8,3 +8,6 @@ build/
 env/
 data/
 *.db
+Dockerfile
+mcp_client.py
+mcp_resoponse.json
