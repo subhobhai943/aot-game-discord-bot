@@ -28,7 +28,7 @@ REACTIONS: dict[str, tuple[str, str, str, str]] = {
     "charge":        ("charge",        "attack on titan charge scout regiment",          "🐎", "{author} charges toward {target}!"),
     "slice":         ("slice",         "levi ackerman slash blade attack on titan",      "🗡️", "{author} slices toward {target}!"),
     "yeager":        ("yeager",        "eren yeager tatakae attack on titan",            "🔥", "{author} goes full Yeager on {target}!"),
-    # ── NEW: AoT Combat & Special commands ──────────────────────────────
+    # ── AoT Combat & Special commands ──────────────────────────────────
     "kill":          ("kill",          "levi ackerman kill titan attack on titan",       "☠️",  "{author} eliminates {target}! *They never saw it coming.*"),
     "odm":           ("odm",           "ODM gear swing attack on titan survey corps",    "🪝", "{author} swings past {target} on ODM gear!"),
     "thunder_spear": ("thunder_spear", "thunder spear attack on titan explosion",        "💥", "{author} fires a Thunder Spear at {target}! BOOM! 💥"),
@@ -47,7 +47,6 @@ REACTIONS: dict[str, tuple[str, str, str, str]] = {
 }
 
 REACTION_COLORS: dict[str, discord.Color] = {
-    # Social
     "hug":          discord.Color(0xFF91A4),
     "pat":          discord.Color.teal(),
     "slap":         discord.Color.red(),
@@ -62,7 +61,6 @@ REACTION_COLORS: dict[str, discord.Color] = {
     "dance":        discord.Color.blurple(),
     "laugh":        discord.Color(0xFFD700),
     "wink":         discord.Color.teal(),
-    # Combat
     "punch":        discord.Color.red(),
     "transform":    discord.Color.dark_orange(),
     "salute":       discord.Color.dark_gold(),
@@ -70,7 +68,6 @@ REACTION_COLORS: dict[str, discord.Color] = {
     "charge":       discord.Color.dark_green(),
     "slice":        discord.Color.light_grey(),
     "yeager":       discord.Color.from_rgb(0, 200, 120),
-    # New AoT
     "kill":         discord.Color.from_rgb(30, 30, 30),
     "odm":          discord.Color.from_rgb(50, 120, 200),
     "thunder_spear":discord.Color.from_rgb(255, 140, 0),
@@ -88,7 +85,6 @@ REACTION_COLORS: dict[str, discord.Color] = {
     "freedom":      discord.Color.from_rgb(100, 160, 255),
 }
 
-# Commands that don't strictly require a target
 OPTIONAL_TARGET = {
     "cry", "dance", "laugh", "transform", "scream", "charge",
     "founding", "scout", "rumble", "freedom", "colossal",
@@ -154,7 +150,7 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
     @commands.command(name="wink")
     async def wink(self, ctx, member: discord.Member = None): await self._react(ctx, member, "wink")
 
-    # ── Original combat ────────────────────────────────────────────────
+    # ── Original combat ──────────────────────────────────────────────────
     @commands.command(name="punch")
     async def punch(self, ctx, member: discord.Member = None): await self._react(ctx, member, "punch")
     @commands.command(name="transform", aliases=["titan"])
@@ -170,14 +166,15 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
     @commands.command(name="yeager", aliases=["tatakae"])
     async def yeager(self, ctx, member: discord.Member = None): await self._react(ctx, member, "yeager")
 
-    # ── NEW: AoT combat & special ─────────────────────────────────────────
+    # ── AoT combat & special ─────────────────────────────────────────────
     @commands.command(name="kill", aliases=["eliminate", "slay"])
     async def kill(self, ctx, member: discord.Member = None): await self._react(ctx, member, "kill")
 
     @commands.command(name="odm", aliases=["gear", "odmgear"])
     async def odm(self, ctx, member: discord.Member = None): await self._react(ctx, member, "odm")
 
-    @commands.command(name="thunder_spear", aliases=["spear", "thunderspear"])
+    # FIXED: removed 'thunderspear' alias — it was conflicting with battle.py's tspear command
+    @commands.command(name="thunder_spear", aliases=["spear", "tspear"])
     async def thunder_spear(self, ctx, member: discord.Member = None): await self._react(ctx, member, "thunder_spear")
 
     @commands.command(name="nape", aliases=["napeslice"])
@@ -216,7 +213,6 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
     @commands.command(name="freedom", aliases=["wingoffreedom", "fly"])
     async def freedom(self, ctx, member: discord.Member = None): await self._react(ctx, member, "freedom")
 
-    # ── Help: list all commands ────────────────────────────────────────────
     @commands.command(name="reactions", aliases=["gifhelp", "gifcmds"])
     async def list_reactions(self, ctx):
         p = ctx.prefix.strip()
@@ -229,31 +225,9 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
             description=f"Use `{p}<command> @user` for animated AoT GIFs!",
             color=discord.Color.dark_red(),
         )
-        embed.add_field(
-            name="💖 Social Reactions",
-            value=" • ".join(f"`{p}{a}`" for a in social),
-            inline=False
-        )
-        embed.add_field(
-            name="⚔️ Original Combat",
-            value=" • ".join(f"`{p}{a}`" for a in combat),
-            inline=False
-        )
-        embed.add_field(
-            name="💥 New AoT Special Commands",
-            value=" • ".join(f"`{p}{a}`" for a in new_aot),
-            inline=False
-        )
-        embed.add_field(
-            name="💡 Aliases (examples)",
-            value=(
-                f"`{p}titan` = transform • `{p}tatakae` = yeager\n"
-                f"`{p}spear` = thunder_spear • `{p}kick` = levi_kick\n"
-                f"`{p}rumbling` = rumble • `{p}reiner` = armored\n"
-                f"`{p}breach` = wall_break • `{p}fly` = freedom"
-            ),
-            inline=False
-        )
+        embed.add_field(name="💖 Social", value=" • ".join(f"`{a}`" for a in social), inline=False)
+        embed.add_field(name="⚔️ Combat", value=" • ".join(f"`{a}`" for a in combat), inline=False)
+        embed.add_field(name="💥 AoT Special", value=" • ".join(f"`{a}`" for a in new_aot), inline=False)
         embed.set_footer(text="🪝 AoT Game Bot • Wings of Freedom")
         await ctx.send(embed=embed)
 

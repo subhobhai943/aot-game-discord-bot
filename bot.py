@@ -97,27 +97,26 @@ bot = commands.Bot(command_prefix=get_prefix_for_bot, intents=intents)
 
 COGS = [
     "cogs.settings",
-    "cogs.help",
-    "cogs.battle",        # fixed: no longer imports aot.core.database (broken dep)
-    "cogs.lore",
-    "cogs.odm",
-    "cogs.profile",
-    "cogs.arena",
-    "cogs.gifs",
-    "cogs.mikasa",
-    "cogs.games",
-    "cogs.abilities",
-    "cogs.afk",
-    "cogs.automod",
-    "cogs.music",
-    "cogs.colors",
-    "cogs.lookup",
-    "cogs.activate_rumbling",
-    # ── Game system ──
-    "cogs.titan_catch",    # 👹 OwO-style spawn + catch + collection
-    "cogs.pvp",            # ⚔️  Player vs Player titan battles
-    "cogs.leaderboard",    # 🏆 Rankings and leaderboards
-    "cogs.owogames",       # 🎮 OwO-style mini-games (flip/dice/slots/8ball/rps/scramble/guess)
+    "cogs.help",           # ❓ Help menu (buttons + dropdown)
+    "cogs.battle",         # ⚔️  PvE Titan battles
+    "cogs.lore",           # 📖 AoT lore lookups
+    "cogs.odm",            # 🪝 ODM gear simulation
+    "cogs.profile",        # 🧙 Scout profiles
+    "cogs.arena",          # 🏟️  Arena mode
+    "cogs.gifs",           # 🎭 Reaction GIFs
+    "cogs.mikasa",         # 🧣 Mikasa interactions
+    "cogs.games",          # 🎮 AoT mini-games
+    "cogs.abilities",      # ⚡ Special abilities
+    "cogs.afk",            # 💤 AFK system
+    "cogs.automod",        # 🛡️  AutoMod
+    "cogs.music",          # 🎵 Music
+    "cogs.colors",         # 🎨 Name colors
+    "cogs.lookup",         # 🔍 Phone lookup
+    "cogs.activate_rumbling",  # 💀 The Rumbling
+    "cogs.titan_catch",    # 👹 Spawn + catch + collection
+    "cogs.pvp",            # ⚔️  Player vs Player
+    "cogs.leaderboard",    # 🏆 Rankings
+    # cogs.owogames removed — no longer needed
 ]
 
 
