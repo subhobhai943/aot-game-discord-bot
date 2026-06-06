@@ -11,7 +11,7 @@ import aiohttp
 from urllib.parse import quote_plus
 
 GIPHY_KEY = os.getenv("GIPHY_API_KEY", "dc6zaTOxFJmzC")
-TENOR_KEY  = os.getenv("TENOR_API_KEY", "AIzaSyAyimkuEcdFq3sAXQlBGBXk-sTOSCMQ-vc")
+TENOR_KEY  = os.getenv("TENOR_API_KEY", "LIVDSRZULELA")
 
 
 # ── Curated AoT GIF fallback list ─────────────────────────────────────────
