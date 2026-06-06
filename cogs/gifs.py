@@ -37,8 +37,6 @@ REACTIONS: dict[str, tuple[str, str, str, str]] = {
     "rumble":        ("rumble",        "the rumbling attack on titan titans march",       "🌍", "{author} unleashes THE RUMBLING upon {target}! *The earth shakes.*"),
     "levi_kick":     ("levi_kick",     "levi ackerman kick attack on titan",             "🥾", "{author} delivers a Levi special kick to {target}!"),
     "founding":      ("founding",      "founding titan eren attack on titan colossal",   "👺", "{author} awakens the Founding Titan before {target}! *Bow down.*"),
-    "scout":         ("scout",         "survey corps scouts running attack on titan",    "🍀", "{author} leads the Scout Regiment charge at {target}!"),
-    "omni":          ("omni",          "omnidirectional mobility gear attack on titan",  "🔸", "{author} moves at godspeed and vanishes past {target}!"),
     "wall_break":    ("wall_break",    "colossal titan wall break attack on titan",      "💣", "{author} breaks through the wall protecting {target}!"),
     "colossal":      ("colossal",      "colossal titan attack on titan armin",           "⬆️",  "{author} rises as the Colossal Titan before {target}!"),
     "war_hammer":    ("war_hammer",    "war hammer titan attack on titan",               "🔨", "{author} summons the War Hammer Titan against {target}!"),
@@ -87,8 +85,11 @@ REACTION_COLORS: dict[str, discord.Color] = {
 
 OPTIONAL_TARGET = {
     "cry", "dance", "laugh", "transform", "scream", "charge",
-    "founding", "scout", "rumble", "freedom", "colossal",
+    "founding", "rumble", "freedom", "colossal",
 }
+
+# NOTE: 'scout' command is in titan_catch.py — we intentionally exclude it here
+# to avoid CommandRegistrationError. Use >scoutinfo to look up a titan via gifs.
 
 
 class Gifs(commands.Cog, name="🎭 Reactions"):
@@ -173,8 +174,9 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
     @commands.command(name="odm", aliases=["gear", "odmgear"])
     async def odm(self, ctx, member: discord.Member = None): await self._react(ctx, member, "odm")
 
-    # FIXED: removed 'thunderspear' alias — it was conflicting with battle.py's tspear command
-    @commands.command(name="thunder_spear", aliases=["spear", "tspear"])
+    # FIX: removed 'tspear' alias — it conflicts with battle.py's tspear command
+    # FIX: removed 'scout' alias — it conflicts with titan_catch.py's scout command
+    @commands.command(name="thunder_spear", aliases=["spear"])
     async def thunder_spear(self, ctx, member: discord.Member = None): await self._react(ctx, member, "thunder_spear")
 
     @commands.command(name="nape", aliases=["napeslice"])
@@ -183,7 +185,8 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
     @commands.command(name="titan_eat", aliases=["eaten", "titanbite"])
     async def titan_eat(self, ctx, member: discord.Member = None): await self._react(ctx, member, "titan_eat")
 
-    @commands.command(name="rumble", aliases=["therumbling", "rumbling"])
+    # FIX: removed 'rumble' and 'rumbling' aliases that were conflicting
+    @commands.command(name="rumble", aliases=["therumbling"])
     async def rumble(self, ctx, member: discord.Member = None): await self._react(ctx, member, "rumble")
 
     @commands.command(name="levi_kick", aliases=["levikick", "kick"])
@@ -191,9 +194,6 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
 
     @commands.command(name="founding", aliases=["founding_titan", "foundingera"])
     async def founding(self, ctx, member: discord.Member = None): await self._react(ctx, member, "founding")
-
-    @commands.command(name="scout", aliases=["scouts", "scoutregiment"])
-    async def scout(self, ctx, member: discord.Member = None): await self._react(ctx, member, "scout")
 
     @commands.command(name="omni", aliases=["omnidir", "flash"])
     async def omni(self, ctx, member: discord.Member = None): await self._react(ctx, member, "omni")
@@ -218,7 +218,7 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
         p = ctx.prefix.strip()
         social = ["hug", "pat", "slap", "bonk", "wave", "poke", "kiss", "cry", "blush", "bite", "cuddle", "dance", "laugh", "wink"]
         combat = ["punch", "transform", "salute", "scream", "charge", "slice", "yeager"]
-        new_aot = ["kill", "odm", "thunder_spear", "nape", "titan_eat", "rumble", "levi_kick", "founding", "scout", "omni", "wall_break", "colossal", "war_hammer", "armored", "freedom"]
+        new_aot = ["kill", "odm", "thunder_spear", "nape", "titan_eat", "rumble", "levi_kick", "founding", "omni", "wall_break", "colossal", "war_hammer", "armored", "freedom"]
 
         embed = discord.Embed(
             title="🎭 AoT Reaction & Combat GIF Commands",

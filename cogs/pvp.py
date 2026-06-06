@@ -1,5 +1,9 @@
 """Player vs Player titan battle system.
-Command: Aot battle @user
+Command: >battle @user
+
+FIX: Replaced all emoji reactions with discord.ui.View Buttons.
+FIX: Challenge accept/decline now uses Accept/Decline buttons.
+FIX: Battle moves (Attack/Defend/Special) now use buttons instead of reactions.
 """
 from __future__ import annotations
 import asyncio
@@ -45,8 +49,75 @@ def _battle_embed(session: PvPSession, log: list[str], c_name: str, o_name: str)
     if log:
         embed.add_field(name="\U0001f4dc Battle Log", value="\n".join(log[-4:]), inline=False)
     embed.set_thumbnail(url=TITAN_IMAGES.get(c_titan, SURVEY_CORPS_ICON))
-    embed.set_footer(text="React \u2694\ufe0f Attack | \U0001f6e1\ufe0f Defend | \U0001f4a5 Special")
     return embed
+
+
+# ── Challenge Accept/Decline View ─────────────────────────────────────────
+class ChallengeView(discord.ui.View):
+    """Buttons for accepting or declining a PvP challenge."""
+
+    def __init__(self, opponent: discord.Member):
+        super().__init__(timeout=BATTLE_TIMEOUT)
+        self.opponent = opponent
+        self.accepted: bool | None = None
+
+    @discord.ui.button(label="✅ Accept", style=discord.ButtonStyle.success)
+    async def accept_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.opponent.id:
+            await interaction.response.send_message("❌ Only the challenged player can respond!", ephemeral=True)
+            return
+        self.accepted = True
+        self._disable_all()
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    @discord.ui.button(label="❌ Decline", style=discord.ButtonStyle.danger)
+    async def decline_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.opponent.id:
+            await interaction.response.send_message("❌ Only the challenged player can respond!", ephemeral=True)
+            return
+        self.accepted = False
+        self._disable_all()
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    def _disable_all(self):
+        for item in self.children:
+            item.disabled = True
+
+
+# ── Battle Move View ───────────────────────────────────────────────────────
+class MoveView(discord.ui.View):
+    """Buttons for choosing a battle move (Attack / Defend / Special)."""
+
+    def __init__(self, current_player_id: int):
+        super().__init__(timeout=TURN_TIMEOUT)
+        self.current_player_id = current_player_id
+        self.chosen_move: str | None = None
+
+    async def _handle(self, interaction: discord.Interaction, move: str):
+        if interaction.user.id != self.current_player_id:
+            await interaction.response.send_message(
+                "❌ It's not your turn!", ephemeral=True
+            )
+            return
+        self.chosen_move = move
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    @discord.ui.button(label="⚔️ Attack", style=discord.ButtonStyle.danger)
+    async def attack_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._handle(interaction, "attack")
+
+    @discord.ui.button(label="🛡️ Defend", style=discord.ButtonStyle.primary)
+    async def defend_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._handle(interaction, "defend")
+
+    @discord.ui.button(label="💥 Special", style=discord.ButtonStyle.secondary)
+    async def special_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._handle(interaction, "special")
 
 
 class PvP(commands.Cog):
@@ -56,13 +127,13 @@ class PvP(commands.Cog):
         self.bot  = bot
         self._log: dict[str, list[str]] = {}
 
-    # ── Aot battle @user ───────────────────────────────────────────────────
+    # ── >battle @user ──────────────────────────────────────────────────────
     @commands.command(name="battle", aliases=["pvp", "vs", "challenge"])
     async def battle(self, ctx: commands.Context, opponent: discord.Member):
         """
         Challenge another player to a titan PvP battle!
-        Usage: Aot battle @user
-        Both players must have an active titan set (use Aot setactive <titan>).
+        Usage: >battle @user
+        Both players must have an active titan set (use >setactive <titan>).
         """
         if opponent.bot or opponent == ctx.author:
             await ctx.send("\u274c You can't battle a bot or yourself!")
@@ -71,18 +142,18 @@ class PvP(commands.Cog):
         c_player = GameState.get_player(str(ctx.author.id), ctx.author.display_name)
         o_player = GameState.get_player(str(opponent.id), opponent.display_name)
 
-        prefix = ctx.prefix or "Aot "
+        prefix = ctx.prefix or ">"
 
         if not c_player.active_titan:
             await ctx.send(
                 f"\u274c {ctx.author.mention}, you have no active titan!\n"
-                f"Catch one with `{prefix}catch`, then equip it with `{prefix}setactive <name>`."
+                f"Wait for a titan to spawn, catch it, then use `{prefix}setactive <name>`."
             )
             return
         if not o_player.active_titan:
             await ctx.send(
                 f"\u274c {opponent.mention} has no active titan set yet!\n"
-                f"They need to use `{prefix}setactive <name>` first."
+                f"They need to catch one and use `{prefix}setactive <name>` first."
             )
             return
 
@@ -106,36 +177,28 @@ class PvP(commands.Cog):
                 f"{RARITY_EMOJI.get(c_stats.get('rarity','Common'),'')} **{c_titan}**\n"
                 f"\U0001f535 **{opponent.display_name}** \u2192 "
                 f"{RARITY_EMOJI.get(o_stats.get('rarity','Common'),'')} **{o_titan}**\n\n"
-                f"{opponent.mention}, react with \u2705 to accept or \u274c to decline!"
+                f"{opponent.mention}, click **Accept** or **Decline** below!"
             ),
             color=0xFFAA00
         )
         challenge_embed.set_thumbnail(url=TITAN_IMAGES.get(c_titan, SURVEY_CORPS_ICON))
-        msg = await ctx.send(embed=challenge_embed)
-        await msg.add_reaction("\u2705")
-        await msg.add_reaction("\u274c")
 
-        def check(reaction, user):
-            return (
-                user == opponent
-                and str(reaction.emoji) in ("\u2705", "\u274c")
-                and reaction.message.id == msg.id
-            )
+        view = ChallengeView(opponent)
+        msg  = await ctx.send(embed=challenge_embed, view=view)
 
-        try:
-            reaction, _ = await self.bot.wait_for("reaction_add", timeout=BATTLE_TIMEOUT, check=check)
-        except asyncio.TimeoutError:
+        await view.wait()
+
+        if view.accepted is None:
             await ctx.send(f"\u23f0 {opponent.mention} didn't respond in time. Challenge cancelled.")
             return
-
-        if str(reaction.emoji) == "\u274c":
+        if not view.accepted:
             await ctx.send(f"\u274c {opponent.mention} declined the battle challenge.")
             return
 
         # Start session
-        session         = GameState.start_pvp(str(ctx.author.id), str(opponent.id), c_titan, o_titan)
+        session            = GameState.start_pvp(str(ctx.author.id), str(opponent.id), c_titan, o_titan)
         session.channel_id = ctx.channel.id
-        log_key         = f"{ctx.author.id}_{opponent.id}"
+        log_key            = f"{ctx.author.id}_{opponent.id}"
         self._log[log_key] = ["\u2694\ufe0f **Battle started!** May the strongest titan win!"]
 
         await self._run_battle(ctx, session, c_player, o_player, log_key)
@@ -149,16 +212,14 @@ class PvP(commands.Cog):
         o_player,
         log_key: str,
     ):
-        channel     = ctx.channel
-        log         = self._log[log_key]
-        c_name      = c_player.username
-        o_name      = o_player.username
-        move_emojis = {"\u2694\ufe0f": "attack", "\U0001f6e1\ufe0f": "defend", "\U0001f4a5": "special"}
+        channel  = ctx.channel
+        log      = self._log[log_key]
+        c_name   = c_player.username
+        o_name   = o_player.username
 
+        # Initial battle embed (no move buttons yet)
         battle_msg = await channel.send(embed=_battle_embed(session, log, c_name, o_name))
         session.message_id = battle_msg.id
-        for e in move_emojis:
-            await battle_msg.add_reaction(e)
 
         defending: dict[str, bool] = {}
 
@@ -171,22 +232,16 @@ class PvP(commands.Cog):
             turn_embed = _battle_embed(session, log, c_name, o_name)
             turn_embed.description = (
                 f"\u23f3 **{current_obj.display_name}'s turn!** "
-                f"React to choose your move! ({TURN_TIMEOUT}s)"
+                f"Choose your move! ({TURN_TIMEOUT}s)"
             )
-            await battle_msg.edit(embed=turn_embed)
 
-            def react_check(reaction, user):
-                return (
-                    user.id == int(current_id)
-                    and str(reaction.emoji) in move_emojis
-                    and reaction.message.id == battle_msg.id
-                )
+            move_view = MoveView(current_obj.id)
+            await battle_msg.edit(embed=turn_embed, view=move_view)
 
-            try:
-                reaction, _ = await self.bot.wait_for("reaction_add", timeout=TURN_TIMEOUT, check=react_check)
-                move = move_emojis[str(reaction.emoji)]
-            except asyncio.TimeoutError:
-                move = "attack"
+            await move_view.wait()
+            move = move_view.chosen_move or "attack"  # auto-attack on timeout
+
+            if move_view.chosen_move is None:
                 log.append(f"\u23f0 {current_obj.display_name} timed out \u2014 auto-attack!")
 
             is_challenger = (current_id == session.challenger_id)
@@ -223,6 +278,8 @@ class PvP(commands.Cog):
 
             if session.challenger_hp <= 0 or session.opponent_hp <= 0:
                 session.active = False
+                # Disable buttons on last move
+                await battle_msg.edit(embed=_battle_embed(session, log, c_name, o_name), view=None)
                 break
 
             session.current_turn = opponent_id
@@ -240,7 +297,7 @@ class PvP(commands.Cog):
         w_player = GameState.get_player(winner_id, winner_member.display_name if winner_member else "?")
         l_player = GameState.get_player(loser_id,  loser_member.display_name  if loser_member  else "?")
 
-        w_player.wins  += 1; w_player.kills += 1; w_player.coins += 50; w_player.add_xp(100)
+        w_player.wins   += 1; w_player.kills += 1; w_player.coins += 50; w_player.add_xp(100)
         l_player.losses += 1; l_player.add_xp(30)
         GameState.save_player(w_player)
         GameState.save_player(l_player)
@@ -249,7 +306,7 @@ class PvP(commands.Cog):
 
         win_titan = session.challenger_titan if winner_id == session.challenger_id else session.opponent_titan
         win_stats = TITAN_STATS.get(win_titan, {})
-        prefix    = ctx.prefix or "Aot "
+        prefix    = ctx.prefix or ">"
 
         result_embed = discord.Embed(
             title="\U0001f3c6 Battle Over!",

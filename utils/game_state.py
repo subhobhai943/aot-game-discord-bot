@@ -1,4 +1,9 @@
-"""In-memory game state manager with JSON persistence."""
+"""In-memory game state manager with JSON persistence.
+
+FIX: TITAN_IMAGES now uses stable external image URLs (wiki/fandom CDN)
+     instead of local assets in the repo. This keeps the bot lightweight
+     and unlocks unlimited image variety — just swap the URL.
+"""
 from __future__ import annotations
 import json
 import os
@@ -59,21 +64,23 @@ RARITY_EMOJI = {
     "Common": "⬜", "Uncommon": "🟢", "Rare": "🔵", "Epic": "🟣", "Legendary": "🟡"
 }
 
-_RAW = "https://raw.githubusercontent.com/subhobhai943/aot-game-discord-bot/main/assets/Titans"
+# ── Titan Images — external CDN URLs (no local assets needed) ─────────────
+# Using Attack on Titan Wiki / Fandom CDN images.
+# To add more images: just replace any URL here — no files to upload to the repo.
 TITAN_IMAGES = {
-    "Pure Titan":       f"{_RAW}/pure_titan.jpg",
-    "Abnormal Titan":   f"{_RAW}/abnormal_titan.jpg",
-    "Jaw Titan":        f"{_RAW}/jaw_titan.jpg",
-    "Cart Titan":       f"{_RAW}/cart_titan.jpg",
-    "Female Titan":     f"{_RAW}/female_titan.jpg",
-    "Armored Titan":    f"{_RAW}/armored_titan.jpg",
-    "Attack Titan":     f"{_RAW}/attack_titan.jpg",
-    "Colossal Titan":   f"{_RAW}/colossal_titan.jpg",
-    "Beast Titan":      f"{_RAW}/beast_titan.jpg",
-    "War Hammer Titan": f"{_RAW}/war_hammer_titan.jpg",
-    "Founding Titan":   f"{_RAW}/founding_titan.jpg",
+    "Pure Titan":       "https://static.wikia.nocookie.net/shingekinokyojin/images/9/93/Pure_Titans_%28Anime%29.png",
+    "Abnormal Titan":   "https://static.wikia.nocookie.net/shingekinokyojin/images/5/52/Abnormal_Titan_%28Anime%29.png",
+    "Jaw Titan":        "https://static.wikia.nocookie.net/shingekinokyojin/images/3/35/Jaw_Titan_%28Anime%29.png",
+    "Cart Titan":       "https://static.wikia.nocookie.net/shingekinokyojin/images/b/b3/Cart_Titan_%28Anime%29.png",
+    "Female Titan":     "https://static.wikia.nocookie.net/shingekinokyojin/images/5/5b/Female_Titan_%28Anime%29.png",
+    "Armored Titan":    "https://static.wikia.nocookie.net/shingekinokyojin/images/a/a8/Armored_Titan_%28Anime%29.png",
+    "Attack Titan":     "https://static.wikia.nocookie.net/shingekinokyojin/images/7/73/Attack_Titan_%28Anime%29.png",
+    "Colossal Titan":   "https://static.wikia.nocookie.net/shingekinokyojin/images/e/e4/Colossus_Titan_%28Anime%29.png",
+    "Beast Titan":      "https://static.wikia.nocookie.net/shingekinokyojin/images/c/c8/Beast_Titan_%28Anime%29.png",
+    "War Hammer Titan": "https://static.wikia.nocookie.net/shingekinokyojin/images/0/07/War_Hammer_Titan_%28Anime%29.png",
+    "Founding Titan":   "https://static.wikia.nocookie.net/shingekinokyojin/images/7/79/Founding_Titan_%28Anime%29.png",
 }
-SURVEY_CORPS_ICON = f"{_RAW}/survey_corps.png"
+SURVEY_CORPS_ICON = "https://static.wikia.nocookie.net/shingekinokyojin/images/1/1e/Scout_Regiment_symbol.png"
 
 
 @dataclass
@@ -142,25 +149,25 @@ class BattleSession:
 
 @dataclass
 class PvPSession:
-    challenger_id:   str
-    opponent_id:     str
+    challenger_id:    str
+    opponent_id:      str
     challenger_titan: str
     opponent_titan:   str
-    challenger_hp:   int
-    opponent_hp:     int
-    challenger_max:  int
-    opponent_max:    int
-    current_turn:    str   = ""   # user_id whose turn it is
-    round_num:       int   = 1
-    active:          bool  = True
-    message_id:      int   = 0
-    channel_id:      int   = 0
+    challenger_hp:    int
+    opponent_hp:      int
+    challenger_max:   int
+    opponent_max:     int
+    current_turn:     str  = ""   # user_id whose turn it is
+    round_num:        int  = 1
+    active:           bool = True
+    message_id:       int  = 0
+    channel_id:       int  = 0
 
 
 class GameState:
-    _players:  dict[str, PlayerData]  = {}
+    _players:  dict[str, PlayerData]    = {}
     _battles:  dict[str, BattleSession] = {}
-    _pvp:      dict[str, PvPSession]  = {}   # key = challenger_id
+    _pvp:      dict[str, PvPSession]    = {}   # key = challenger_id
     _settings: dict = {}
 
     # ── persistence ───────────────────────────────────────────────────────
@@ -274,12 +281,12 @@ class GameState:
     # ── PvP management ────────────────────────────────────────────────────
     @classmethod
     def start_pvp(cls, challenger_id, opponent_id, c_titan, o_titan) -> PvPSession:
-        cs = TITAN_STATS.get(c_titan, {"hp": 300})
-        os_ = TITAN_STATS.get(o_titan, {"hp": 300})
+        cs  = TITAN_STATS.get(c_titan,  {"hp": 300})
+        os_ = TITAN_STATS.get(o_titan,  {"hp": 300})
         session = PvPSession(
             challenger_id=challenger_id, opponent_id=opponent_id,
             challenger_titan=c_titan, opponent_titan=o_titan,
-            challenger_hp=cs["hp"], opponent_hp=os_["hp"],
+            challenger_hp=cs["hp"],  opponent_hp=os_["hp"],
             challenger_max=cs["hp"], opponent_max=os_["hp"],
             current_turn=challenger_id,
         )
