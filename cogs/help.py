@@ -10,7 +10,7 @@ CATEGORIES = [
         "label": "⚔️ Battle",
         "emoji": "⚔️",
         "color": 0xC0392B,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Turn-based PvE battles against Titans & PvP duels against other soldiers.",
         "fields": [
             ("Aot fight <titan>",        "Start a PvE turn-based battle vs a Titan"),
@@ -25,7 +25,7 @@ CATEGORIES = [
         "label": "👹 Titans",
         "emoji": "👹",
         "color": 0x8E44AD,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Catch, collect, and command Titans — build your army!",
         "fields": [
             ("Aot catch",                "Catch the currently spawned Titan"),
@@ -42,7 +42,7 @@ CATEGORIES = [
         "label": "🎭 Reactions",
         "emoji": "🎭",
         "color": 0xE74C3C,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "AoT-themed GIF reactions — social and combat. Use `Aot <cmd> @user`.",
         "fields": [
             ("Social",  "hug · pat · slap · bonk · wave · poke · kiss · cry · blush · bite · cuddle · dance · laugh · wink"),
@@ -56,7 +56,7 @@ CATEGORIES = [
         "label": "🎮 Games",
         "emoji": "🎮",
         "color": 0xF39C12,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "AoT mini-games, trivia, and ODM training challenges.",
         "fields": [
             ("/trivia",           "AoT trivia challenge"),
@@ -71,7 +71,7 @@ CATEGORIES = [
         "label": "🗡️ Titan Shifters",
         "emoji": "🗡️",
         "color": 0x34495E,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "AoT-themed social deduction game! Find the Titan Shifters before they eat the Survey Corps.",
         "fields": [
             ("Aot titan_game create",    "Create a new game lobby"),
@@ -88,7 +88,7 @@ CATEGORIES = [
         "label": "🧙 Profile",
         "emoji": "🧙",
         "color": 0x1ABC9C,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Your scout identity, stats, and character.",
         "fields": [
             ("/profile [@user]",     "View your profile card + Discord PFP"),
@@ -102,7 +102,7 @@ CATEGORIES = [
         "label": "⚡ Abilities",
         "emoji": "⚡",
         "color": 0xE67E22,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Special abilities, titan transformations, and ODM gear upgrades.",
         "fields": [
             ("/ability",           "Use your scout's signature ability"),
@@ -116,7 +116,7 @@ CATEGORIES = [
         "label": "📖 Lore",
         "emoji": "📖",
         "color": 0xD4AC0D,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Explore AoT lore — characters, titans, and iconic quotes.",
         "fields": [
             ("/character <name>",         "Look up an AoT character"),
@@ -129,7 +129,7 @@ CATEGORIES = [
         "label": "🪂 ODM Gear",
         "emoji": "🪂",
         "color": 0x2E86C1,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Simulate ODM gear physics and nape strikes in real-time.",
         "fields": [
             ("/odm_grapple <dist> [speed] [gas]", "Simulate an ODM grapple (10–200m)"),
@@ -141,7 +141,7 @@ CATEGORIES = [
         "label": "🧣 Mikasa",
         "emoji": "🧣",
         "color": 0x922B21,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Mikasa Ackerman-themed interactions and devotion commands.",
         "fields": [
             ("/mikasa <action> [@user]", "Mikasa actions: red_scarf, protect, devotion..."),
@@ -155,7 +155,7 @@ CATEGORIES = [
         "label": "🛡️ Moderation",
         "emoji": "🛡️",
         "color": 0x5D6D7E,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Server moderation, AFK management, and AutoMod configuration.",
         "fields": [
             ("Aot afk [message]",        "Set yourself AFK with an AoT-themed message"),
@@ -170,7 +170,7 @@ CATEGORIES = [
         "label": "⚙️ Settings",
         "emoji": "⚙️",
         "color": 0x7F8C8D,
-        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Server and bot configuration (some require Manage Server).",
         "fields": [
             ("/set_prefix <prefix>", "Set a custom command prefix for this server"),
@@ -208,7 +208,7 @@ def _overview_embed() -> discord.Embed:
             inline=True,
         )
     embed.set_footer(text="\U0001fab9 AoT Game Bot  •  © 2026 Subhadip Sarkar  •  Use buttons below")
-    embed.set_thumbnail(url="https://i.imgur.com/9V9p7hZ.png")
+    embed.set_thumbnail(url="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png")
     return embed
 
 

@@ -43,6 +43,7 @@ def get_prefix(bot, message):
         if not lower_p.endswith(" "):
             prefixes.append(f"{lower_p} ")
             
+    prefixes.sort(key=len, reverse=True)
     return commands.when_mentioned_or(*prefixes)(bot, message)
 
 

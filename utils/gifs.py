@@ -225,12 +225,12 @@ AOT_FALLBACK_GIFS: dict[str, list[str]] = {
 
 
 async def _from_tenor(query: str) -> str:
-    """Tenor v2 API — fastest source for anime GIFs."""
+    """Tenor v1 API — fastest source for anime GIFs."""
     if not TENOR_KEY:
         return ""
     url = (
-        "https://tenor.googleapis.com/v2/search"
-        f"?q={quote_plus(query)}&key={TENOR_KEY}&limit=15&media_filter=gif"
+        "https://api.tenor.com/v1/search"
+        f"?q={quote_plus(query)}&key={TENOR_KEY}&limit=15&media_filter=minimal"
     )
     try:
         sess = _session()
@@ -238,9 +238,9 @@ async def _from_tenor(query: str) -> str:
             if resp.status == 200:
                 data = await resp.json()
                 urls = [
-                    item["media_formats"]["gif"]["url"]
+                    item["media"][0]["gif"]["url"]
                     for item in data.get("results", [])[:10]
-                    if item.get("media_formats", {}).get("gif", {}).get("url")
+                    if item.get("media", [{}])[0].get("gif", {}).get("url")
                 ]
                 if urls:
                     return random.choice(urls)
