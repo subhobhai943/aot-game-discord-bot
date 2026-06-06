@@ -16,12 +16,17 @@ INTENTS.reactions = True
 
 DEFAULT_PREFIX = ">"
 
+import cogs.settings
+
 # Guild prefix storage (in-memory; replace with DB if you want persistence)
 _PREFIXES: dict[int, str] = {}
 
 
 def get_prefix(bot, message):
     if message.guild:
+        p = cogs.settings.get_prefix(message.guild.id)
+        if p != "!":
+            return p
         return _PREFIXES.get(message.guild.id, DEFAULT_PREFIX)
     return DEFAULT_PREFIX
 
@@ -48,6 +53,7 @@ COGS = [
     "cogs.pvp",
     "cogs.leaderboard",
     "cogs.owogames",
+    "cogs.titan_game",
 ]
 
 
@@ -76,15 +82,15 @@ class AoTBot(commands.Bot):
                 failed.append((cog, e))
 
         for name in loaded:
-            print(f"  ✔ Loaded {name}")
+            print(f"  [OK] Loaded {name}")
         for name, err in failed:
-            print(f"  ✘ Failed to load {name}: {err}")
+            print(f"  [FAIL] Failed to load {name}: {err}")
 
         try:
             synced = await self.tree.sync()
-            print(f"  ✅ All slash commands synced! ({len(synced)} commands)")
+            print(f"  [OK] All slash commands synced! ({len(synced)} commands)")
         except Exception as e:
-            print(f"  ❌ Slash sync failed: {e}")
+            print(f"  [FAIL] Slash sync failed: {e}")
 
     async def close(self):
         # Cleanly close the shared HTTP session on shutdown

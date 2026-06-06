@@ -12,7 +12,10 @@ This saves ~200-400ms per request and reduces memory churn.
 import os
 import random
 import aiohttp
+import logging
 from urllib.parse import quote_plus
+
+logger = logging.getLogger("aot.gifs")
 
 GIPHY_KEY = os.getenv("GIPHY_API_KEY", "dc6zaTOxFJmzC")
 TENOR_KEY  = os.getenv("TENOR_API_KEY",  "LIVDSRZULELA")
@@ -240,9 +243,12 @@ async def _from_tenor(query: str) -> str:
                     if item.get("media_formats", {}).get("gif", {}).get("url")
                 ]
                 if urls:
-                    return random.choice(urls)
-    except Exception:
-        pass
+                    random.shuffle(urls)
+                    for u in urls:
+                        if await _validate_url(u, sess):
+                            return u
+    except Exception as e:
+        logger.warning(f"Tenor API error for '{query}': {e}")
     return ""
 
 
@@ -265,9 +271,12 @@ async def _from_giphy(query: str) -> str:
                     if item.get("images", {}).get("original", {}).get("url")
                 ]
                 if urls:
-                    return random.choice(urls)
-    except Exception:
-        pass
+                    random.shuffle(urls)
+                    for u in urls:
+                        if await _validate_url(u, sess):
+                            return u
+    except Exception as e:
+        logger.warning(f"Giphy API error for '{query}': {e}")
     return ""
 
 
@@ -290,4 +299,27 @@ async def get_gif(action: str, _tenor_query: str = "") -> str:
 
     # Use curated fallback — always works
     fallback = AOT_FALLBACK_GIFS.get(action) or AOT_FALLBACK_GIFS.get("transform", [])
-    return random.choice(fallback) if fallback else ""
+    
+    sess = _session()
+    if fallback:
+        random.shuffle(fallback)
+        for fb_url in fallback:
+            if await _validate_url(fb_url, sess):
+                return fb_url
+
+    logger.error(f"Failed to fetch any valid GIF for action '{action}'")
+    return ""
+
+async def _validate_url(url: str, sess: aiohttp.ClientSession) -> bool:
+    """Check if the URL returns a valid image without downloading the full body."""
+    try:
+        async with sess.head(url, timeout=2.0) as resp:
+            if resp.status == 200 and 'image' in resp.headers.get('Content-Type', ''):
+                return True
+            # Some CDNs block HEAD requests, fallback to GET with stream
+            if resp.status in (405, 403, 501):
+                async with sess.get(url, timeout=2.0) as get_resp:
+                    return get_resp.status == 200 and 'image' in get_resp.headers.get('Content-Type', '')
+    except Exception:
+        pass
+    return False
