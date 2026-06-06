@@ -6,42 +6,44 @@ from utils.gifs import get_gif
 
 REACTIONS: dict[str, tuple[str, str, str, str]] = {
     # ── Social reactions ─────────────────────────────────────────────
-    "hug":           ("hug",           "attack on titan hug anime",                     "🤗", "{author} hugs {target}!"),
-    "pat":           ("pat",           "attack on titan pat anime",                     "🫱", "{author} pats {target}!"),
-    "slap":          ("slap",          "attack on titan slap anime",                    "👋", "{author} slaps {target}! 💥"),
-    "bonk":          ("bonk",          "levi ackerman hit anime",                       "🔨", "{author} bonks {target}! 🔨"),
-    "wave":          ("wave",          "anime wave hello friendly",                     "👋", "{author} waves at {target}!"),
-    "poke":          ("poke",          "attack on titan poke anime",                    "👉", "{author} pokes {target}!"),
-    "kiss":          ("kiss",          "eren mikasa kiss anime",                        "💋", "{author} kisses {target}!"),
-    "cry":           ("cry",           "attack on titan cry anime",                     "😢", "{author} is crying..."),
-    "blush":         ("blush",         "mikasa blush anime",                            "😊", "{author} blushes at {target}!"),
-    "bite":          ("bite",          "attack on titan bite anime",                    "😬", "{author} bites {target}!"),
-    "cuddle":        ("cuddle",        "attack on titan cuddle anime",                  "🤗", "{author} cuddles {target}!"),
-    "dance":         ("dance",         "attack on titan funny dance",                   "💃", "{author} dances with {target}!"),
-    "laugh":         ("laugh",         "attack on titan laugh anime",                   "😂", "{author} laughs at {target}!"),
-    "wink":          ("wink",          "attack on titan wink anime",                    "😉", "{author} winks at {target}!"),
+    "hug":           ("hug",           "anime hug",                                      "🤗", "{author} hugs {target}!"),
+    "pat":           ("pat",           "anime head pat",                                  "🫱", "{author} pats {target}!"),
+    "slap":          ("slap",          "anime slap",                                      "👋", "{author} slaps {target}! 💥"),
+    "bonk":          ("bonk",          "anime bonk",                                      "🔨", "{author} bonks {target}! 🔨"),
+    "wave":          ("wave",          "anime wave hello",                                "👋", "{author} waves at {target}!"),
+    "poke":          ("poke",          "anime poke",                                      "👉", "{author} pokes {target}!"),
+    "kiss":          ("kiss",          "anime kiss",                                      "💋", "{author} kisses {target}!"),
+    "cry":           ("cry",           "anime cry",                                       "😢", "{author} is crying..."),
+    "blush":         ("blush",         "anime blush",                                     "😊", "{author} blushes at {target}!"),
+    "bite":          ("bite",          "anime bite",                                      "😬", "{author} bites {target}!"),
+    "cuddle":        ("cuddle",        "anime cuddle",                                    "🤗", "{author} cuddles {target}!"),
+    "dance":         ("dance",         "anime dance",                                     "💃", "{author} dances with {target}!"),
+    "laugh":         ("laugh",         "anime laugh",                                     "😂", "{author} laughs at {target}!"),
+    "wink":          ("wink",          "anime wink",                                      "😉", "{author} winks at {target}!"),
     # ── Combat reactions ────────────────────────────────────────────
-    "punch":         ("punch",         "attack on titan punch anime",                   "👊", "{author} punches {target}! 💥"),
-    "transform":     ("transform",     "eren titan transformation attack on titan",      "⚡",   "{author} transforms before {target}!"),
-    "salute":        ("salute",        "survey corps salute attack on titan",            "🫱", "{author} salutes {target}! Sasageyo!"),
-    "scream":        ("scream",        "eren yeager scream tatakae attack on titan",     "🗣️", "{author} screams at {target}! TATAKAE!"),
-    "charge":        ("charge",        "attack on titan charge scout regiment",          "🐎", "{author} charges toward {target}!"),
-    "slice":         ("slice",         "levi ackerman slash blade attack on titan",      "🗡️", "{author} slices toward {target}!"),
-    "yeager":        ("yeager",        "eren yeager tatakae attack on titan",            "🔥", "{author} goes full Yeager on {target}!"),
-    # ── AoT Combat & Special commands ──────────────────────────────────
-    "kill":          ("kill",          "levi ackerman kill titan attack on titan",       "☠️",  "{author} eliminates {target}! *They never saw it coming.*"),
-    "odm":           ("odm",           "ODM gear swing attack on titan survey corps",    "🪝", "{author} swings past {target} on ODM gear!"),
-    "thunder_spear": ("thunder_spear", "thunder spear attack on titan explosion",        "💥", "{author} fires a Thunder Spear at {target}! BOOM! 💥"),
-    "nape":          ("nape",          "nape slash titan attack on titan kill",          "⚔️",  "{author} goes for the nape of {target}!"),
-    "titan_eat":     ("titan_eat",     "titan eating attack on titan horror",            "😱", "{target} gets eaten by a Titan — {author} watches in horror!"),
-    "rumble":        ("rumble",        "the rumbling attack on titan titans march",       "🌍", "{author} unleashes THE RUMBLING upon {target}! *The earth shakes.*"),
-    "levi_kick":     ("levi_kick",     "levi ackerman kick attack on titan",             "🥾", "{author} delivers a Levi special kick to {target}!"),
-    "founding":      ("founding",      "founding titan eren attack on titan colossal",   "👺", "{author} awakens the Founding Titan before {target}! *Bow down.*"),
-    "wall_break":    ("wall_break",    "colossal titan wall break attack on titan",      "💣", "{author} breaks through the wall protecting {target}!"),
-    "colossal":      ("colossal",      "colossal titan attack on titan armin",           "⬆️",  "{author} rises as the Colossal Titan before {target}!"),
-    "war_hammer":    ("war_hammer",    "war hammer titan attack on titan",               "🔨", "{author} summons the War Hammer Titan against {target}!"),
-    "armored":       ("armored",       "armored titan reiner attack on titan",           "🛡️", "{author} goes Armored Titan mode on {target}!"),
-    "freedom":       ("freedom",       "attack on titan wings of freedom survey corps",  "🦅", "{author} and {target} spread their wings — *fly free, soldiers!*"),
+    "punch":         ("punch",         "anime punch",                                     "👊", "{author} punches {target}! 💥"),
+    "transform":     ("transform",     "eren titan transformation",                       "⚡",  "{author} transforms before {target}!"),
+    "salute":        ("salute",        "survey corps salute attack on titan",             "🫡", "{author} salutes {target}! Sasageyo!"),
+    "scream":        ("scream",        "eren yeager scream tatakae",                      "🗣️", "{author} screams at {target}! TATAKAE!"),
+    "charge":        ("charge",        "attack on titan charge scouts",                   "🐎", "{author} charges toward {target}!"),
+    "slice":         ("slice",         "levi ackerman slash",                             "🗡️", "{author} slices toward {target}!"),
+    "yeager":        ("yeager",        "eren yeager tatakae",                             "🔥", "{author} goes full Yeager on {target}!"),
+    # ── AoT Special commands ──────────────────────────────────────────
+    "kill":          ("kill",          "levi ackerman kill titan",                        "☠️",  "{author} eliminates {target}!"),
+    "odm":           ("odm",           "ODM gear swing attack on titan",                  "🪝", "{author} swings past {target} on ODM gear!"),
+    "thunder_spear": ("thunder_spear", "thunder spear attack on titan",                   "💥", "{author} fires a Thunder Spear at {target}! BOOM! 💥"),
+    "nape":          ("nape",          "nape slash titan attack on titan",                "⚔️",  "{author} goes for the nape of {target}!"),
+    "titan_eat":     ("titan_eat",     "titan eating attack on titan",                    "😱", "{target} gets eaten by a Titan!"),
+    "rumble":        ("rumble",        "the rumbling attack on titan",                    "🌍", "{author} unleashes THE RUMBLING upon {target}!"),
+    "levi_kick":     ("levi_kick",     "levi ackerman kick",                              "🥾", "{author} delivers a Levi kick to {target}!"),
+    "founding":      ("founding",      "founding titan eren attack on titan",             "👺", "{author} awakens the Founding Titan before {target}!"),
+    "wall_break":    ("wall_break",    "colossal titan wall break",                       "💣", "{author} breaks through the wall protecting {target}!"),
+    "colossal":      ("colossal",      "colossal titan attack on titan",                  "⬆️",  "{author} rises as the Colossal Titan before {target}!"),
+    "war_hammer":    ("war_hammer",    "war hammer titan",                                "🔨", "{author} summons the War Hammer Titan against {target}!"),
+    "armored":       ("armored",       "armored titan reiner",                            "🛡️", "{author} goes Armored Titan mode on {target}!"),
+    "freedom":       ("freedom",       "wings of freedom attack on titan",                "🦅", "{author} and {target} spread their wings!"),
+    # FIX: added missing omni entry that was causing KeyError crash
+    "omni":          ("omni",          "ODM omnidirectional gear attack on titan",        "🪝", "{author} goes omnidirectional on {target}!"),
 }
 
 REACTION_COLORS: dict[str, discord.Color] = {
@@ -74,7 +76,6 @@ REACTION_COLORS: dict[str, discord.Color] = {
     "rumble":       discord.Color.from_rgb(80, 60, 40),
     "levi_kick":    discord.Color.from_rgb(90, 90, 90),
     "founding":     discord.Color.from_rgb(160, 0, 255),
-    "scout":        discord.Color.from_rgb(0, 160, 80),
     "omni":         discord.Color.from_rgb(30, 180, 230),
     "wall_break":   discord.Color.from_rgb(200, 100, 0),
     "colossal":     discord.Color.from_rgb(255, 80, 0),
@@ -88,9 +89,6 @@ OPTIONAL_TARGET = {
     "founding", "rumble", "freedom", "colossal",
 }
 
-# NOTE: 'scout' command is in titan_catch.py — we intentionally exclude it here
-# to avoid CommandRegistrationError. Use >scoutinfo to look up a titan via gifs.
-
 
 class Gifs(commands.Cog, name="🎭 Reactions"):
     """AoT-themed reaction & combat GIF commands."""
@@ -99,6 +97,11 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
         self.bot = bot
 
     async def _react(self, ctx: commands.Context, member: discord.Member | None, action: str):
+        """Core handler — send a typing indicator immediately so the user sees activity."""
+        if action not in REACTIONS:
+            await ctx.send(f"❌ Unknown reaction: `{action}`")
+            return
+
         _, query, emoji, template = REACTIONS[action]
         needs_target = action not in OPTIONAL_TARGET
 
@@ -107,10 +110,12 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
             await ctx.send(f"❌ Please mention someone!\nExample: `{p}{action} @user`")
             return
 
-        author = ctx.author.display_name
-        target = member.display_name if member else "the battlefield"
-        desc = template.format(author=author, target=target)
-        gif_url = await get_gif(action, query)
+        # Show typing indicator ASAP — makes the bot feel instant
+        async with ctx.typing():
+            author = ctx.author.display_name
+            target = member.display_name if member else "the battlefield"
+            desc = template.format(author=author, target=target)
+            gif_url = await get_gif(action, query)
 
         embed = discord.Embed(
             description=f"**{emoji} {desc}**",
@@ -174,8 +179,6 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
     @commands.command(name="odm", aliases=["gear", "odmgear"])
     async def odm(self, ctx, member: discord.Member = None): await self._react(ctx, member, "odm")
 
-    # FIX: removed 'tspear' alias — it conflicts with battle.py's tspear command
-    # FIX: removed 'scout' alias — it conflicts with titan_catch.py's scout command
     @commands.command(name="thunder_spear", aliases=["spear"])
     async def thunder_spear(self, ctx, member: discord.Member = None): await self._react(ctx, member, "thunder_spear")
 
@@ -185,7 +188,6 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
     @commands.command(name="titan_eat", aliases=["eaten", "titanbite"])
     async def titan_eat(self, ctx, member: discord.Member = None): await self._react(ctx, member, "titan_eat")
 
-    # FIX: removed 'rumble' and 'rumbling' aliases that were conflicting
     @commands.command(name="rumble", aliases=["therumbling"])
     async def rumble(self, ctx, member: discord.Member = None): await self._react(ctx, member, "rumble")
 

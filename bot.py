@@ -1,136 +1,130 @@
+"""ODM Striker — AoT Discord game bot."""
 import os
-import sys
-import subprocess
-import shutil
-import urllib.request
-import tarfile
+import asyncio
+import aiohttp
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
-from cogs.settings import get_prefix
+import utils.gifs as gifs_module
 
 load_dotenv()
 
+INTENTS = discord.Intents.default()
+INTENTS.message_content = True
+INTENTS.members = True
+INTENTS.reactions = True
 
-def install_all_requirements():
-    req_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "requirements.txt")
-    if not os.path.isfile(req_file):
-        print("[Setup] requirements.txt not found, skipping.")
-        return
-    print("[Setup] Installing all packages from requirements.txt...")
-    try:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "-r", req_file, "--quiet"],
-        )
-        print("[Setup] All requirements installed!")
-    except Exception as e:
-        print(f"[Setup] Warning: some packages failed to install: {e}")
+DEFAULT_PREFIX = ">"
+
+# Guild prefix storage (in-memory; replace with DB if you want persistence)
+_PREFIXES: dict[int, str] = {}
 
 
-def install_system_deps():
-    if shutil.which("apt-get"):
-        try:
-            print("[Setup] Installing libsodium + ffmpeg via apt...")
-            subprocess.check_call(
-                ["apt-get", "install", "-y", "-q", "libsodium-dev", "ffmpeg"],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-            print("[Setup] libsodium + ffmpeg installed via apt!")
-            return True
-        except Exception as e:
-            print(f"[Setup] apt install failed: {e}")
-    return False
-
-
-def install_ffmpeg_fallback():
-    if shutil.which("ffmpeg"):
-        print("[Setup] ffmpeg already available in PATH.")
-        return
-
-    ffmpeg_dir = os.path.join(os.path.expanduser("~"), "ffmpeg_bin")
-    ffmpeg_bin = os.path.join(ffmpeg_dir, "ffmpeg")
-
-    if os.path.isfile(ffmpeg_bin):
-        os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
-        print("[Setup] ffmpeg found in ~/ffmpeg_bin, added to PATH.")
-        return
-
-    print("[Setup] Downloading static ffmpeg binary...")
-    os.makedirs(ffmpeg_dir, exist_ok=True)
-    url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-    archive_path = os.path.join(ffmpeg_dir, "ffmpeg.tar.xz")
-    try:
-        urllib.request.urlretrieve(url, archive_path)
-        with tarfile.open(archive_path, "r:xz") as tar:
-            for member in tar.getmembers():
-                if member.name.endswith("/ffmpeg") and member.isfile():
-                    member.name = "ffmpeg"
-                    tar.extract(member, ffmpeg_dir)
-                    break
-        os.remove(archive_path)
-        os.chmod(ffmpeg_bin, 0o755)
-        os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
-        print("[Setup] ffmpeg installed at ~/ffmpeg_bin/ffmpeg!")
-    except Exception as e:
-        print(f"[Setup] WARNING: ffmpeg fallback download failed: {e}")
-
-
-apt_success = install_system_deps()
-install_all_requirements()
-if not apt_success:
-    install_ffmpeg_fallback()
-
-
-def get_prefix_for_bot(bot, message):
+def get_prefix(bot, message):
     if message.guild:
-        p = get_prefix(message.guild.id)
-        return [p + " ", p]
-    return ["! ", "!"]
+        return _PREFIXES.get(message.guild.id, DEFAULT_PREFIX)
+    return DEFAULT_PREFIX
 
-
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
-intents.reactions = True
-
-bot = commands.Bot(command_prefix=get_prefix_for_bot, intents=intents)
 
 COGS = [
     "cogs.settings",
-    "cogs.help",           # ❓ Help menu (buttons + dropdown)
-    "cogs.battle",         # ⚔️  PvE Titan battles
-    "cogs.lore",           # 📖 AoT lore lookups
-    "cogs.odm",            # 🪝 ODM gear simulation
-    "cogs.profile",        # 🧙 Scout profiles
-    "cogs.arena",          # 🏟️  Arena mode
-    "cogs.gifs",           # 🎭 Reaction GIFs
-    "cogs.mikasa",         # 🧣 Mikasa interactions
-    "cogs.games",          # 🎮 AoT mini-games
-    "cogs.abilities",      # ⚡ Special abilities
-    "cogs.afk",            # 💤 AFK system
-    "cogs.automod",        # 🛡️  AutoMod
-    "cogs.music",          # 🎵 Music
-    "cogs.colors",         # 🎨 Name colors
-    "cogs.lookup",         # 🔍 Phone lookup
-    "cogs.activate_rumbling",  # 💀 The Rumbling
-    "cogs.titan_catch",    # 👹 Spawn + catch + collection
-    "cogs.pvp",            # ⚔️  Player vs Player
-    "cogs.leaderboard",    # 🏆 Rankings
-    # cogs.owogames removed — no longer needed
+    "cogs.help",
+    "cogs.battle",
+    "cogs.lore",
+    "cogs.odm",
+    "cogs.profile",
+    "cogs.arena",
+    "cogs.gifs",
+    "cogs.mikasa",
+    "cogs.games",
+    "cogs.abilities",
+    "cogs.afk",
+    "cogs.automod",
+    "cogs.music",
+    "cogs.colors",
+    "cogs.lookup",
+    "cogs.activate_rumbling",
+    "cogs.titan_catch",
+    "cogs.pvp",
+    "cogs.leaderboard",
+    "cogs.owogames",
 ]
 
 
-@bot.event
-async def on_ready():
-    print(f"\u2705 Logged in as {bot.user}")
-    for cog in COGS:
+class AoTBot(commands.Bot):
+    def __init__(self):
+        super().__init__(
+            command_prefix=get_prefix,
+            intents=INTENTS,
+            help_command=None,
+            case_insensitive=True,
+        )
+        self.http_session: aiohttp.ClientSession | None = None
+
+    async def setup_hook(self):
+        # Create a single shared aiohttp session for the whole bot lifecycle.
+        # This is injected into utils/gifs.py so every GIF fetch reuses it.
+        self.http_session = aiohttp.ClientSession()
+        gifs_module.SESSION = self.http_session
+
+        loaded, failed = [], []
+        for cog in COGS:
+            try:
+                await self.load_extension(cog)
+                loaded.append(cog)
+            except Exception as e:
+                failed.append((cog, e))
+
+        for name in loaded:
+            print(f"  ✔ Loaded {name}")
+        for name, err in failed:
+            print(f"  ✘ Failed to load {name}: {err}")
+
         try:
-            await bot.load_extension(cog)
-            print(f"  \u2714 Loaded {cog}")
+            synced = await self.tree.sync()
+            print(f"  ✅ All slash commands synced! ({len(synced)} commands)")
         except Exception as e:
-            print(f"  \u274c Failed to load {cog}: {e}")
-    await bot.tree.sync()
-    print("\u2705 All slash commands synced!")
+            print(f"  ❌ Slash sync failed: {e}")
+
+    async def close(self):
+        # Cleanly close the shared HTTP session on shutdown
+        if self.http_session and not self.http_session.closed:
+            await self.http_session.close()
+        await super().close()
+
+    async def on_ready(self):
+        print(f"\n{'='*50}")
+        print(f"  ODM Striker is online!")
+        print(f"  Logged in as: {self.user} (ID: {self.user.id})")
+        print(f"  Guilds: {len(self.guilds)}")
+        print(f"{'='*50}\n")
+        await self.change_presence(
+            activity=discord.Activity(
+                type=discord.ActivityType.watching,
+                name="The Rumbling | >help"
+            )
+        )
+
+    async def on_command_error(self, ctx, error):
+        if isinstance(error, commands.CommandNotFound):
+            return  # Silently ignore unknown commands
+        if isinstance(error, commands.MissingRequiredArgument):
+            await ctx.send(f"❌ Missing argument: `{error.param.name}`")
+            return
+        if isinstance(error, commands.BadArgument):
+            await ctx.send(f"❌ Bad argument. Did you mention a valid user?")
+            return
+        # Re-raise everything else so it shows in logs
+        raise error
 
 
-bot.run(os.getenv("DISCORD_TOKEN"))
+def main():
+    token = os.getenv("DISCORD_TOKEN")
+    if not token:
+        raise RuntimeError("DISCORD_TOKEN not set in .env")
+    bot = AoTBot()
+    asyncio.run(bot.start(token))
+
+
+if __name__ == "__main__":
+    main()
