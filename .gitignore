@@ -7,7 +7,6 @@ dist/
 build/
 .venv/
 env/
-data/
 *.db
 Dockerfile
 mcp_client.py
