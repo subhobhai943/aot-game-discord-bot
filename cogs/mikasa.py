@@ -208,7 +208,7 @@ class Mikasa(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # ── /ackerman_bond (fixed) ────────────────────────────────────────────
-    @app_commands.command(name="ackerman_bond", description="See your Ackerman-style bond with another user")
+    @app_commands.command(name="ackerman-bond", description="See your Ackerman-style bond with another user")
     async def ackerman_bond(self, interaction: discord.Interaction, user: discord.Member):
         """Calculate an Ackerman bond score — always 1-100, consistent, never breaks."""
         author = interaction.user
@@ -322,7 +322,7 @@ class Mikasa(commands.Cog):
         await interaction.response.send_message(embed=embed)
 
     # ── /mikasa_stats ─────────────────────────────────────────────────
-    @app_commands.command(name="mikasa_stats", description="View Mikasa Ackerman's combat statistics")
+    @app_commands.command(name="mikasa-stats", description="View Mikasa Ackerman's combat statistics")
     async def mikasa_stats(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="⚔️ Mikasa Ackerman - Combat Profile",
@@ -357,7 +357,7 @@ class Mikasa(commands.Cog):
         embed.set_footer(text="🧩 A Wings of Freedom")
         await ctx.send(embed=embed)
 
-    @commands.command(name="red_scarf")
+    @commands.command(name="red-scarf", aliases=["red_scarf"])
     async def red_scarf(self, ctx, member: discord.Member = None):
         target = member.display_name if member else "everyone"
         gif_url = await get_gif("mikasa_scarf", "mikasa red scarf anime")

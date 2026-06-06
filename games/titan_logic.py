@@ -23,7 +23,7 @@ class Player:
         self.is_alive: bool = True
         self.has_voted: bool = False
         self.voted_for: Optional[int] = None
-        self.missions_completed: int = 0
+        self.tasks_completed: int = 0
 
     def __repr__(self):
         return f"<Player {self.user_id} {self.role}>"
@@ -35,10 +35,13 @@ class TitanGameEngine:
     def __init__(self, guild_id: int, channel_id: int, host_id: int):
         self.guild_id = guild_id
         self.channel_id = channel_id
+        self.game_channel_id: Optional[int] = None
         self.host_id = host_id
         self.players: dict[int, Player] = {}
         self.state: GameState = GameState.LOBBY
         self.shifter_count = 1
+        self.total_tasks_completed = 0
+        self.total_tasks_required = 0
         
         self.add_player(host_id)
 
@@ -91,6 +94,7 @@ class TitanGameEngine:
                 p.character_name = sc_chars.pop()
                 p.image_url = ""
 
+        self.total_tasks_required = sum(1 for p in self.players.values() if p.role == Role.SURVEY_CORPS) * 3
         self.state = GameState.EXPLORATION
         return True, "Started"
 
@@ -110,6 +114,21 @@ class TitanGameEngine:
             
         target.is_alive = False
         return True, f"You have devoured {target.character_name}."
+
+    def do_task(self, player_id: int) -> tuple[bool, str]:
+        if self.state != GameState.EXPLORATION:
+            return False, "Not the right phase."
+        player = self.players.get(player_id)
+        if not player or not player.is_alive:
+            return False, "You can't do tasks."
+        if player.role == Role.TITAN_SHIFTER:
+            return False, "You are faking tasks..."
+        if player.tasks_completed >= 3:
+            return False, "You have completed all your tasks!"
+            
+        player.tasks_completed += 1
+        self.total_tasks_completed += 1
+        return True, f"Task completed! ({player.tasks_completed}/3)"
 
     def call_meeting(self, caller_id: int) -> bool:
         if self.state != GameState.EXPLORATION:
@@ -176,5 +195,7 @@ class TitanGameEngine:
             return Role.SURVEY_CORPS
         if alive_shifters >= alive_sc:
             return Role.TITAN_SHIFTER
+        if self.total_tasks_completed >= self.total_tasks_required:
+            return Role.SURVEY_CORPS
             
         return None

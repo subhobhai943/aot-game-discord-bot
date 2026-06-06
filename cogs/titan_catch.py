@@ -9,7 +9,7 @@ import random
 import discord
 from discord.ext import commands, tasks
 from utils.game_state import (
-    GameState, TITAN_STATS, TITAN_WEIGHTS, get_titan_image,
+    GameState, TITAN_STATS, TITAN_WEIGHTS, get_titan_image, attach_image,
     RARITY_COLOR, RARITY_EMOJI, SURVEY_CORPS_ICON
 )
 
@@ -38,14 +38,14 @@ def _spawn_embed(titan_name: str) -> discord.Embed:
         ),
         color=color
     )
-    embed.set_image(url=get_titan_image(titan_name))
+    file = attach_image(embed, get_titan_image(titan_name))
     embed.add_field(name="⚔️ ATK",    value=stats["atk"], inline=True)
     embed.add_field(name="🛡️ DEF",    value=stats["def"], inline=True)
     embed.add_field(name="💨 SPD",    value=stats["spd"], inline=True)
     embed.add_field(name="❤️ HP",     value=stats["hp"],  inline=True)
     embed.add_field(name="⭐ Rarity", value=f"{RARITY_EMOJI[rarity]} {rarity}", inline=True)
     embed.set_footer(text=f"⏳ You have {CATCH_TIMEOUT}s to catch it!")
-    return embed
+    return embed, file
 
 
 # ── Catch Button View ─────────────────────────────────────────────────────
@@ -97,12 +97,12 @@ class CatchView(discord.ui.View):
             ),
             color=RARITY_COLOR[rarity]
         )
-        embed.set_image(url=get_titan_image(self.titan_name))
+        file = attach_image(embed, get_titan_image(self.titan_name))
         embed.add_field(name="💰 Coins Earned", value="+10",  inline=True)
         embed.add_field(name="⚡ XP Earned",    value="+20",  inline=True)
         embed.add_field(name="🗂️ Total Titans", value=player.total_titans(), inline=True)
         embed.set_footer(text="Use >collection to view your titans | >setactive to pick your battle titan")
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed, file=file)
 
     async def on_timeout(self):
         """Called when nobody catches the titan in time."""
@@ -114,8 +114,8 @@ class CatchView(discord.ui.View):
                 description=f"**{self.titan_name}** disappeared back into the wilderness... nobody was fast enough!",
                 color=0xFF3333
             )
-            timeout_embed.set_thumbnail(url=get_titan_image(self.titan_name))
-            await self.channel.send(embed=timeout_embed)
+            file = attach_image(timeout_embed, get_titan_image(self.titan_name), as_thumbnail=True)
+            await self.channel.send(embed=timeout_embed, file=file)
 
 
 class TitanCatch(commands.Cog):
@@ -157,9 +157,9 @@ class TitanCatch(commands.Cog):
     # ── Core spawn logic ───────────────────────────────────────────────────
     async def _do_spawn(self, guild_id: int, channel: discord.TextChannel):
         titan = _spawn_weights()
-        embed = _spawn_embed(titan)
+        embed, file = _spawn_embed(titan)
         view  = CatchView(guild_id, titan, channel)
-        msg   = await channel.send(embed=embed, view=view)
+        msg   = await channel.send(embed=embed, view=view, file=file)
         _active_spawns[guild_id] = {"titan": titan, "message_id": msg.id, "caught": False}
 
     # ── >setspawn ──────────────────────────────────────────────────────────
@@ -174,8 +174,8 @@ class TitanCatch(commands.Cog):
             description=f"Titans will now randomly spawn in {ch.mention}!",
             color=0x55AA55
         )
-        embed.set_thumbnail(url=SURVEY_CORPS_ICON)
-        await ctx.send(embed=embed)
+        file = attach_image(embed, SURVEY_CORPS_ICON, as_thumbnail=True)
+        await ctx.send(embed=embed, file=file)
 
     # ── >spawn (manual, admin) ─────────────────────────────────────────────
     @commands.command(name="spawn")
@@ -242,11 +242,11 @@ class TitanCatch(commands.Cog):
             description=f"**{match}** is now your battle titan!",
             color=RARITY_COLOR[stats["rarity"]]
         )
-        embed.set_thumbnail(url=get_titan_image(match))
+        file = attach_image(embed, get_titan_image(match), as_thumbnail=True)
         embed.add_field(name="⚔️ ATK", value=stats["atk"], inline=True)
         embed.add_field(name="🛡️ DEF", value=stats["def"], inline=True)
         embed.add_field(name="❤️ HP",  value=stats["hp"],  inline=True)
-        await ctx.send(embed=embed)
+        await ctx.send(embed=embed, file=file)
 
     # ── >scout ─────────────────────────────────────────────────────────────
     @commands.command(name="scout")
@@ -264,7 +264,6 @@ class TitanCatch(commands.Cog):
             description=f"Detailed scouting report on the **{match}**.",
             color=RARITY_COLOR[rarity]
         )
-        embed.set_image(url=get_titan_image(match))
         embed.add_field(name="⭐ Rarity", value=f"{RARITY_EMOJI[rarity]} {rarity}", inline=True)
         embed.add_field(name="❤️ HP",     value=stats["hp"],  inline=True)
         embed.add_field(name="⚔️ ATK",    value=stats["atk"], inline=True)
@@ -274,7 +273,8 @@ class TitanCatch(commands.Cog):
         total  = sum(TITAN_WEIGHTS.values())
         chance = round(weight / total * 100, 1)
         embed.add_field(name="🎲 Spawn Chance", value=f"{chance}%", inline=True)
-        await ctx.send(embed=embed)
+        file = attach_image(embed, get_titan_image(match))
+        await ctx.send(embed=embed, file=file)
 
     # ── >release ───────────────────────────────────────────────────────────
     @commands.command(name="release")

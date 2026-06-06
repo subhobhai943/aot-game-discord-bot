@@ -10,6 +10,7 @@ import os
 import random
 from dataclasses import dataclass, field, asdict
 from typing import Optional
+import discord
 from data.titan_images import TITAN_IMAGES as _ALL_TITAN_IMAGES
 
 DATA_FILE        = "data/player_data.json"
@@ -66,13 +67,25 @@ RARITY_EMOJI = {
 }
 
 # ── Titan Images ──────────────────────────────────────────────────────────
-SURVEY_CORPS_ICON = "https://static.wikia.nocookie.net/shingekinokyojin/images/1/1e/Scout_Regiment_symbol.png"
+SURVEY_CORPS_ICON = "assets/Titans/survey_corps.png"
 
 def get_titan_image(titan_name: str) -> str:
     images = _ALL_TITAN_IMAGES.get(titan_name)
     if images:
         return random.choice(images)
     return SURVEY_CORPS_ICON
+
+def attach_image(embed: discord.Embed, path: str, as_thumbnail=False) -> discord.File | None:
+    if not path or not os.path.exists(path):
+        return None
+    filename = os.path.basename(path)
+    file = discord.File(path, filename=filename)
+    url = f"attachment://{filename}"
+    if as_thumbnail:
+        embed.set_thumbnail(url=url)
+    else:
+        embed.set_image(url=url)
+    return file
 
 
 @dataclass

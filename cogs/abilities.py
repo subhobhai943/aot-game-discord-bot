@@ -237,7 +237,7 @@ class Abilities(commands.Cog):
 
     # ── Gear Upgrade System ──────────────────────────────────────────────────
 
-    @app_commands.command(name="gear_upgrade", description="Upgrade your ODM gear and equipment!")
+    @app_commands.command(name="gear-upgrade", description="Upgrade your ODM gear and equipment!")
     async def gear_upgrade(self, interaction: discord.Interaction):
         """View and upgrade your ODM gear components."""
         player = GameState.get_player(str(interaction.user.id), interaction.user.display_name)
@@ -306,7 +306,7 @@ class Abilities(commands.Cog):
         
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="scout_ranking", description="View the top Scouts on the leaderboard!")
+    @app_commands.command(name="scout-ranking", description="View the top Scouts on the leaderboard!")
     async def scout_ranking(self, interaction: discord.Interaction):
         """View the top-ranked Scouts."""
         

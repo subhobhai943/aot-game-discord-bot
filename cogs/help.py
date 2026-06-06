@@ -60,10 +60,10 @@ CATEGORIES = [
         "desc": "AoT mini-games, trivia, and ODM training challenges.",
         "fields": [
             ("/trivia",           "AoT trivia challenge"),
-            ("/spawn_titan",      "Simulate a Titan spawning"),
-            ("/odm_training",     "Test your ODM gear skill"),
-            ("/daily_challenge",  "Daily AoT challenge for XP"),
-            ("/aot_fact",         "Random Attack on Titan fact"),
+            ("/spawn-titan",      "Simulate a Titan spawning"),
+            ("/odm-training",     "Test your ODM gear skill"),
+            ("/daily-challenge",  "Daily AoT challenge for XP"),
+            ("/aot-fact",         "Random Attack on Titan fact"),
         ],
     },
     {
@@ -74,13 +74,13 @@ CATEGORIES = [
         "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "AoT-themed social deduction game! Find the Titan Shifters before they eat the Survey Corps.",
         "fields": [
-            ("Aot titan_game create",    "Create a new game lobby"),
-            ("Aot titan_game join",      "Join the active lobby"),
-            ("Aot titan_game start",     "Start the game (Host only)"),
+            ("Aot titan-game create",    "Create a new game lobby"),
+            ("Aot titan-game join",      "Join the active lobby"),
+            ("Aot titan-game start",     "Start the game (Host only)"),
             ("Aot eliminate @user",      "Eat a crewmate (Titan Shifters only)"),
             ("Aot meeting",              "Call an emergency meeting to vote"),
             ("Aot vote @user",           "Vote to execute a suspected shifter"),
-            ("Aot titan_game status",    "Check the game status"),
+            ("Aot titan-game status",    "Check the game status"),
         ],
     },
     {
@@ -92,7 +92,7 @@ CATEGORIES = [
         "desc": "Your scout identity, stats, and character.",
         "fields": [
             ("/profile [@user]",     "View your profile card + Discord PFP"),
-            ("/choose_scout <name>", "Choose your scout character"),
+            ("/choose-scout <name>", "Choose your scout character"),
             ("Aot leaderboard",      "Server rankings: wins · level · titans · coins"),
             ("Aot myrank [@user]",   "Check your rank across all categories"),
         ],
@@ -107,8 +107,8 @@ CATEGORIES = [
         "fields": [
             ("/ability",           "Use your scout's signature ability"),
             ("/transform <titan>", "Transform into a Titan"),
-            ("/gear_upgrade",      "View & upgrade your ODM gear"),
-            ("/scout_ranking",     "Top 10 Scouts leaderboard"),
+            ("/gear-upgrade",      "View & upgrade your ODM gear"),
+            ("/scout-ranking",     "Top 10 Scouts leaderboard"),
         ],
     },
     {
@@ -132,8 +132,8 @@ CATEGORIES = [
         "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Simulate ODM gear physics and nape strikes in real-time.",
         "fields": [
-            ("/odm_grapple <dist> [speed] [gas]", "Simulate an ODM grapple (10–200m)"),
-            ("/odm_strike [armor] [abilities]",   "Simulate a nape strike"),
+            ("/odm-grapple <dist> [speed] [gas]", "Simulate an ODM grapple (10–200m)"),
+            ("/odm-strike [armor] [abilities]",   "Simulate a nape strike"),
         ],
     },
     {
@@ -144,10 +144,10 @@ CATEGORIES = [
         "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Mikasa Ackerman-themed interactions and devotion commands.",
         "fields": [
-            ("/mikasa <action> [@user]", "Mikasa actions: red_scarf, protect, devotion..."),
-            ("/ackerman_bond <user>",    "Check your Ackerman-style bond"),
-            ("/mikasa_stats",            "Mikasa's combat stats"),
-            ("/red_scarf [@user]",       "Wrap the red scarf around someone"),
+            ("/mikasa <action> [@user]", "Mikasa actions: red-scarf, protect, devotion..."),
+            ("/ackerman-bond <user>",    "Check your Ackerman-style bond"),
+            ("/mikasa-stats",            "Mikasa's combat stats"),
+            ("/red-scarf [@user]",       "Wrap the red scarf around someone"),
         ],
     },
     {
@@ -173,7 +173,7 @@ CATEGORIES = [
         "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Server and bot configuration (some require Manage Server).",
         "fields": [
-            ("/set_prefix <prefix>", "Set a custom command prefix for this server"),
+            ("/set-prefix <prefix>", "Set a custom command prefix for this server"),
             ("/prefix",              "Check the current server prefix"),
             ("Aot colors",           "Change your name color role"),
             ("Aot lookup <number>",  "Look up a phone number"),

@@ -42,7 +42,7 @@ class Profile(commands.Cog):
         embed.set_image(url="attachment://profile.png")
         await interaction.response.send_message(embed=embed, file=file)
 
-    @app_commands.command(name="choose_scout", description="Choose your scout character for battles")
+    @app_commands.command(name="choose-scout", description="Choose your scout character for battles")
     @app_commands.describe(character="Scout name to play as")
     @app_commands.choices(character=[
         app_commands.Choice(name=c, value=c) for c in CHARACTERS

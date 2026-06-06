@@ -7,7 +7,7 @@ class ODM(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="odm_grapple", description="Simulate an ODM gear grapple!")
+    @app_commands.command(name="odm-grapple", description="Simulate an ODM gear grapple!")
     @app_commands.describe(distance="Distance in meters (10-200)", speed="slow/normal/fast", gas="Gas capacity (default 100)")
     async def odm_grapple(self, interaction: discord.Interaction, distance: int, speed: str = "normal", gas: int = 100):
         if speed not in ("slow","normal","fast"):
@@ -24,7 +24,7 @@ class ODM(commands.Cog):
         embed.add_field(name="Result", value=f"```{result}```", inline=False)
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="odm_strike", description="Simulate a nape strike!")
+    @app_commands.command(name="odm-strike", description="Simulate a nape strike!")
     @app_commands.describe(armor_level="Titan armor level 0-5", abilities="Comma-separated abilities")
     async def odm_strike(self, interaction: discord.Interaction, armor_level: int = 0, abilities: str = ""):
         titan_abilities = [a.strip() for a in abilities.split(",") if a.strip()]

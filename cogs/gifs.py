@@ -179,19 +179,19 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
     @commands.command(name="odm", aliases=["gear", "odmgear"])
     async def odm(self, ctx, member: discord.Member = None): await self._react(ctx, member, "odm")
 
-    @commands.command(name="thunder_spear", aliases=["spear"])
+    @commands.command(name="thunder-spear", aliases=["spear", "thunder_spear"])
     async def thunder_spear(self, ctx, member: discord.Member = None): await self._react(ctx, member, "thunder_spear")
 
     @commands.command(name="nape", aliases=["napeslice"])
     async def nape(self, ctx, member: discord.Member = None): await self._react(ctx, member, "nape")
 
-    @commands.command(name="titan_eat", aliases=["eaten", "titanbite"])
+    @commands.command(name="titan-eat", aliases=["eaten", "titanbite", "titan_eat"])
     async def titan_eat(self, ctx, member: discord.Member = None): await self._react(ctx, member, "titan_eat")
 
     @commands.command(name="rumble", aliases=["therumbling"])
     async def rumble(self, ctx, member: discord.Member = None): await self._react(ctx, member, "rumble")
 
-    @commands.command(name="levi_kick", aliases=["levikick", "kick"])
+    @commands.command(name="levi-kick", aliases=["levikick", "kick", "levi_kick"])
     async def levi_kick(self, ctx, member: discord.Member = None): await self._react(ctx, member, "levi_kick")
 
     @commands.command(name="founding", aliases=["founding_titan", "foundingera"])
@@ -200,13 +200,13 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
     @commands.command(name="omni", aliases=["omnidir", "flash"])
     async def omni(self, ctx, member: discord.Member = None): await self._react(ctx, member, "omni")
 
-    @commands.command(name="wall_break", aliases=["wallbreak", "breach"])
+    @commands.command(name="wall-break", aliases=["wallbreak", "breach", "wall_break"])
     async def wall_break(self, ctx, member: discord.Member = None): await self._react(ctx, member, "wall_break")
 
     @commands.command(name="colossal", aliases=["colossaltitan", "bertholdt"])
     async def colossal(self, ctx, member: discord.Member = None): await self._react(ctx, member, "colossal")
 
-    @commands.command(name="war_hammer", aliases=["warhammer", "warhammertitan"])
+    @commands.command(name="war-hammer", aliases=["warhammer", "warhammertitan", "war_hammer"])
     async def war_hammer(self, ctx, member: discord.Member = None): await self._react(ctx, member, "war_hammer")
 
     @commands.command(name="armored", aliases=["armoredtitan", "reiner"])

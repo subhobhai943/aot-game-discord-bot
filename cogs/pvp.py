@@ -11,7 +11,7 @@ import random
 import discord
 from discord.ext import commands
 from utils.game_state import (
-    GameState, PvPSession, TITAN_STATS, get_titan_image,
+    GameState, PvPSession, TITAN_STATS, get_titan_image, attach_image,
     RARITY_COLOR, RARITY_EMOJI, SURVEY_CORPS_ICON, pvp_titan_attack
 )
 
@@ -48,8 +48,8 @@ def _battle_embed(session: PvPSession, log: list[str], c_name: str, o_name: str)
     )
     if log:
         embed.add_field(name="\U0001f4dc Battle Log", value="\n".join(log[-4:]), inline=False)
-    embed.set_thumbnail(url=get_titan_image(c_titan))
-    return embed
+    file = attach_image(embed, get_titan_image(c_titan), as_thumbnail=True)
+    return embed, file
 
 
 # ── Challenge Accept/Decline View ─────────────────────────────────────────
@@ -181,10 +181,10 @@ class PvP(commands.Cog):
             ),
             color=0xFFAA00
         )
-        challenge_embed.set_thumbnail(url=get_titan_image(c_titan))
+        file = attach_image(challenge_embed, get_titan_image(c_titan), as_thumbnail=True)
 
         view = ChallengeView(opponent)
-        msg  = await ctx.send(embed=challenge_embed, view=view)
+        msg  = await ctx.send(embed=challenge_embed, view=view, file=file)
 
         await view.wait()
 
@@ -218,7 +218,8 @@ class PvP(commands.Cog):
         o_name   = o_player.username
 
         # Initial battle embed (no move buttons yet)
-        battle_msg = await channel.send(embed=_battle_embed(session, log, c_name, o_name))
+        embed, file = _battle_embed(session, log, c_name, o_name)
+        battle_msg = await channel.send(embed=embed, file=file)
         session.message_id = battle_msg.id
 
         defending: dict[str, bool] = {}
@@ -229,14 +230,14 @@ class PvP(commands.Cog):
             if current_obj is None:
                 break
 
-            turn_embed = _battle_embed(session, log, c_name, o_name)
+            turn_embed, file = _battle_embed(session, log, c_name, o_name)
             turn_embed.description = (
                 f"\u23f3 **{current_obj.display_name}'s turn!** "
                 f"Choose your move! ({TURN_TIMEOUT}s)"
             )
 
             move_view = MoveView(current_obj.id)
-            await battle_msg.edit(embed=turn_embed, view=move_view)
+            await battle_msg.edit(embed=turn_embed, view=move_view, attachments=[file] if file else [])
 
             await move_view.wait()
             move = move_view.chosen_move or "attack"  # auto-attack on timeout
@@ -279,12 +280,14 @@ class PvP(commands.Cog):
             if session.challenger_hp <= 0 or session.opponent_hp <= 0:
                 session.active = False
                 # Disable buttons on last move
-                await battle_msg.edit(embed=_battle_embed(session, log, c_name, o_name), view=None)
+                embed, file = _battle_embed(session, log, c_name, o_name)
+                await battle_msg.edit(embed=embed, view=None, attachments=[file] if file else [])
                 break
 
             session.current_turn = opponent_id
             session.round_num   += 1
-            await battle_msg.edit(embed=_battle_embed(session, log, c_name, o_name))
+            embed, file = _battle_embed(session, log, c_name, o_name)
+            await battle_msg.edit(embed=embed, attachments=[file] if file else [])
 
         # ── Result ─────────────────────────────────────────────────────────
         if session.challenger_hp <= 0:
@@ -318,9 +321,9 @@ class PvP(commands.Cog):
             ),
             color=0xFFAA00
         )
-        result_embed.set_image(url=get_titan_image(win_titan))
+        file = attach_image(result_embed, get_titan_image(win_titan))
         result_embed.set_footer(text=f"Use {prefix}leaderboard to see the rankings!")
-        await channel.send(embed=result_embed)
+        await channel.send(embed=result_embed, file=file)
 
 
 async def setup(bot):

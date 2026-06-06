@@ -34,7 +34,7 @@ class Settings(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="set_prefix", description="Set a custom command prefix for this server")
+    @app_commands.command(name="set-prefix", description="Set a custom command prefix for this server")
     @app_commands.describe(prefix="Your new prefix (e.g. !, ?, aot!, >)")
     @app_commands.default_permissions(manage_guild=True)  # Only admins/managers
     async def set_prefix(

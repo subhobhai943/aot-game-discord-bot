@@ -8,8 +8,8 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from utils.game_state import (
-    GameState, TITAN_STATS, get_titan_image,
-    calc_move, titan_ai_move, CHARACTERS,
+    GameState, TITAN_STATS, get_titan_image, attach_image,
+    calc_move, titan_ai_move, CHARACTERS, RARITY_COLOR, RARITY_EMOJI,
 )
 
 # ── Try to load the external aot-toolkit library ──────────────────────────
@@ -32,7 +32,7 @@ def _hp_bar(current: int, maximum: int, length: int = 10) -> str:
     return f"`[{bar}]` {current}/{maximum} ({pct}%)"
 
 
-def _battle_embed(session) -> discord.Embed:
+def _battle_embed(session) -> tuple[discord.Embed, discord.File]:
     t_stats = TITAN_STATS.get(session.titan_name, {})
     rarity  = t_stats.get("rarity", "Common")
     embed   = discord.Embed(
@@ -49,8 +49,8 @@ def _battle_embed(session) -> discord.Embed:
         value=_hp_bar(session.titan_hp, session.titan_max_hp),
         inline=False
     )
-    embed.set_thumbnail(url=get_titan_image(session.titan_name))
-    return embed
+    file = attach_image(embed, get_titan_image(session.titan_name), as_thumbnail=True)
+    return embed, file
 
 
 class Battle(commands.Cog):
@@ -129,9 +129,9 @@ class Battle(commands.Cog):
             await ctx.send("\u274c You already have an active battle! Finish it or use `Aot flee`.")
             return
         session = GameState.start_battle(str(ctx.author.id), c_match, t_match, ctx.channel.id)
-        embed   = _battle_embed(session)
+        embed, file = _battle_embed(session)
         embed.set_footer(text="Use: Aot slash | Aot odmdash | Aot spear | Aot spiral | Aot smash | Aot defend")
-        await ctx.send(embed=embed)
+        await ctx.send(embed=embed, file=file)
 
     # ── Prefix move commands  (NO aliases that clash with gifs.py) ─────────
     # NOTE: gifs.py owns: odm, thunder_spear, spear, slice, charge, etc.
@@ -223,10 +223,10 @@ class Battle(commands.Cog):
             await send_fn(embed=embed)
             return
 
-        embed = _battle_embed(session)
+        embed, file = _battle_embed(session)
         embed.add_field(name="\U0001f4dc This Round", value="\n".join(log), inline=False)
         embed.set_footer(text="Aot slash | Aot odmdash | Aot tspear | Aot spiralcut | Aot smash | Aot pvedefend")
-        await send_fn(embed=embed)
+        await send_fn(embed=embed, file=file)
 
 
 async def setup(bot):

@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import random
-from utils.game_state import GameState, TITANS, CHARACTERS, get_titan_image, SURVEY_CORPS_ICON
+from utils.game_state import GameState, TITANS, CHARACTERS, get_titan_image, SURVEY_CORPS_ICON, attach_image
 from utils.gifs import get_gif
 
 
@@ -115,10 +115,10 @@ class Games(commands.Cog):
             description=f"**{q['question']}**\n\n" + "\n".join(f"{letters[i]} {options[i]}" for i in range(4)),
             color=discord.Color.gold()
         )
-        embed.set_thumbnail(url=q.get("image", SURVEY_CORPS_ICON))
+        file = attach_image(embed, q.get("image", SURVEY_CORPS_ICON), as_thumbnail=True)
         embed.set_footer(text="⏳ You have 30 seconds to answer! | React with the correct letter")
 
-        msg = await interaction.response.send_message(embed=embed)
+        msg = await interaction.response.send_message(embed=embed, file=file)
         msg = await interaction.original_response()
         for letter in letters:
             await msg.add_reaction(letter)
@@ -134,7 +134,7 @@ class Games(commands.Cog):
 
     # ── Titan Spawn Simulator ──────────────────────────────────────────────────
 
-    @app_commands.command(name="spawn_titan", description="Simulate a Titan spawning in the wasteland!")
+    @app_commands.command(name="spawn-titan", description="Simulate a Titan spawning in the wasteland!")
     async def spawn_titan(self, interaction: discord.Interaction):
         items = list(TITAN_SPAWN_DATA.items())
         names = [item[0] for item in items]
@@ -165,8 +165,7 @@ class Games(commands.Cog):
         embed.add_field(name="📜 Description", value=data["description"], inline=False)
 
         titan_img = get_titan_image(result)
-        if titan_img:
-            embed.set_image(url=titan_img)
+        file = attach_image(embed, titan_img) if titan_img else None
 
         if data["rarity"] == "Legendary":
             embed.set_footer(text="💀 RUN! A LEGENDARY TITAN HAS APPEARED! 💀")
@@ -175,11 +174,11 @@ class Games(commands.Cog):
         else:
             embed.set_footer(text="📢 Sound the alarm! All soldiers to positions!")
 
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed, file=file)
 
     # ── ODM Gear Training ─────────────────────────────────────────────────────
 
-    @app_commands.command(name="odm_training", description="Test your ODM gear skills with a training simulation!")
+    @app_commands.command(name="odm-training", description="Test your ODM gear skills with a training simulation!")
     @app_commands.describe(difficulty="Training difficulty level")
     @app_commands.choices(difficulty=[
         app_commands.Choice(name="Beginner",     value="easy"),
@@ -232,8 +231,8 @@ class Games(commands.Cog):
             description=f"{grade_emoji} **Final Grade: {grade}** ({percentage}%)\n**Score:** {score}/{d['obstacles']} obstacles cleared",
             color=color
         )
-        embed.set_thumbnail(url=SURVEY_CORPS_ICON)
-        embed.set_image(url=banner)
+        file1 = attach_image(embed, SURVEY_CORPS_ICON, as_thumbnail=True)
+        file2 = attach_image(embed, banner)
 
         result_text = "\n".join(results[:10])
         if len(results) > 10:
@@ -249,11 +248,12 @@ class Games(commands.Cog):
 
         embed.add_field(name="🔖 New Level", value=f"Level {player.level} ({player.xp}/{player.xp_needed} XP)", inline=True)
         embed.set_footer(text="Remember: Speed is everything in ODM combat!")
-        await interaction.response.send_message(embed=embed)
+        files = [f for f in (file1, file2) if f]
+        await interaction.response.send_message(embed=embed, files=files)
 
     # ── Daily Challenge ────────────────────────────────────────────────────────────
 
-    @app_commands.command(name="daily_challenge", description="Get today's AoT daily challenge!")
+    @app_commands.command(name="daily-challenge", description="Get today's AoT daily challenge!")
     async def daily_challenge(self, interaction: discord.Interaction):
         challenges = [
             {"title": "Titan Slayer",  "desc": "Win a battle against any titan",              "reward": 50,  "image": get_titan_image("Pure Titan")},
@@ -269,7 +269,7 @@ class Games(commands.Cog):
             description=f"**{challenge['title']}**\n\n{challenge['desc']}",
             color=discord.Color.blurple()
         )
-        embed.set_thumbnail(url=challenge["image"])
+        file = attach_image(embed, challenge["image"], as_thumbnail=True)
         embed.add_field(name="🎁 Reward",     value=f"{challenge['reward']} XP", inline=True)
         embed.add_field(name="⏱️ Time Limit", value="24 hours",                inline=True)
         embed.set_footer(text="Complete challenges for bonus XP!")
@@ -281,11 +281,11 @@ class Games(commands.Cog):
                 value=f"**{q['question']}**\n*(Answer: {q['options'][q['answer']]}) — {q['explanation']}*",
                 inline=False
             )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed, file=file)
 
     # ── Random Fact ───────────────────────────────────────────────────────────────
 
-    @app_commands.command(name="aot_fact", description="Get a random Attack on Titan fact!")
+    @app_commands.command(name="aot-fact", description="Get a random Attack on Titan fact!")
     async def aot_fact(self, interaction: discord.Interaction):
         facts = [
             {"text": "Eren's Titan form is 15 meters tall, the same height as the Attack Titan.",                                   "image": get_titan_image("Attack Titan")},
@@ -312,9 +312,9 @@ class Games(commands.Cog):
             description=fact["text"],
             color=discord.Color.gold()
         )
-        embed.set_thumbnail(url=fact["image"])
+        file = attach_image(embed, fact["image"], as_thumbnail=True)
         embed.set_footer(text="🧩 The mystery of the Titans continues...")
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed, file=file)
 
 
 async def setup(bot):
