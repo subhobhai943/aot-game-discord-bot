@@ -1,3 +1,0 @@
-event: message
-data: {"result":{"content":[{"type":"text","text":"{\u0022id\u0022:\u0022r_Mx98Fd\u0022,\u0022username\u0022:\u0022w8Q4F\u0022,\u0022password\u0022:\u0022Ge36EkHm52A\u0022,\u0022pushUrl\u0022:\u0022https://w8Q4F:Ge36EkHm52A@justrunmy.app/git/r_Mx98Fd\u0022,\u0022pushAutoDeployCommand\u0022:\u0022git push -u https://w8Q4F:Ge36EkHm52A@justrunmy.app/git/r_Mx98Fd HEAD:deploy\u0022}"}]},"id":2,"jsonrpc":"2.0"}
-
