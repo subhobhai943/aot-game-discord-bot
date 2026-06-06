@@ -33,6 +33,9 @@ class Player:
         self.tasks_completed: int = 0
         self.next_kill_at: float = 0.0
         self.meetings_called: int = 0
+        # Per-game assigned puzzle tasks (indices into AOT_PUZZLE_TASKS)
+        self.assigned_task_indices: list[int] = []
+        self.current_task_index: int = 0  # which assigned task they're on next
 
     def __repr__(self) -> str:
         return f"<Player {self.user_id} {self.role}>"
@@ -126,6 +129,13 @@ class TitanGameEngine:
         remaining = max(0.0, self.VOTE_DURATION_SECONDS - elapsed)
         return int(remaining + 0.999)
 
+    def assign_tasks_to_player(self, player: Player, all_task_count: int):
+        """Assign TASKS_PER_PLAYER unique task indices to a player."""
+        indices = list(range(all_task_count))
+        random.shuffle(indices)
+        player.assigned_task_indices = indices[:self.TASKS_PER_PLAYER]
+        player.current_task_index = 0
+
     def start_game(self) -> tuple[bool, str]:
         if len(self.players) < self.MIN_PLAYERS:
             return False, f"Not enough players. Need at least {self.MIN_PLAYERS}."
@@ -149,6 +159,9 @@ class TitanGameEngine:
         ]
         random.shuffle(titan_types)
 
+        from cogs.titan_game import AOT_PUZZLE_TASKS  # imported here to avoid circular
+        task_count = len(AOT_PUZZLE_TASKS)
+
         for user_id in player_ids:
             player = self.players[user_id]
             player.is_alive = True
@@ -167,6 +180,7 @@ class TitanGameEngine:
                 player.role = Role.SURVEY_CORPS
                 player.character_name = sc_chars.pop()
                 player.image_url = ""
+                self.assign_tasks_to_player(player, task_count)
 
         self.total_tasks_completed = 0
         self.total_tasks_required = sum(
@@ -210,8 +224,18 @@ class TitanGameEngine:
             return False, "You have already finished every mission task."
 
         player.tasks_completed += 1
+        player.current_task_index += 1
         self.total_tasks_completed += 1
         return True, f"Task completed. ({player.tasks_completed}/{self.TASKS_PER_PLAYER})"
+
+    def get_next_task_index(self, player_id: int) -> Optional[int]:
+        """Return the AOT_PUZZLE_TASKS index for the player's next task, or None if done."""
+        player = self.players.get(player_id)
+        if not player or player.role == Role.TITAN_SHIFTER:
+            return None
+        if player.current_task_index >= len(player.assigned_task_indices):
+            return None
+        return player.assigned_task_indices[player.current_task_index]
 
     def call_meeting(self, caller_id: int) -> bool:
         if self.state != GameState.EXPLORATION:
