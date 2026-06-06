@@ -54,7 +54,7 @@ class AFK(commands.Cog):
         self.bot = bot
 
     # ── Prefix command ─────────────────────────────────────────────────
-    @commands.command(name="afk", aliases=["AFK"])
+    @commands.command(name="afk")
     async def afk_prefix(self, ctx, *, reason: str = "Gone beyond the walls"):
         """Set yourself as AFK with an AoT-themed message."""
         # Mark this message so on_message doesn't immediately unset AFK

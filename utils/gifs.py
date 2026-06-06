@@ -243,10 +243,7 @@ async def _from_tenor(query: str) -> str:
                     if item.get("media_formats", {}).get("gif", {}).get("url")
                 ]
                 if urls:
-                    random.shuffle(urls)
-                    for u in urls:
-                        if await _validate_url(u, sess):
-                            return u
+                    return random.choice(urls)
     except Exception as e:
         logger.warning(f"Tenor API error for '{query}': {e}")
     return ""
@@ -271,10 +268,7 @@ async def _from_giphy(query: str) -> str:
                     if item.get("images", {}).get("original", {}).get("url")
                 ]
                 if urls:
-                    random.shuffle(urls)
-                    for u in urls:
-                        if await _validate_url(u, sess):
-                            return u
+                    return random.choice(urls)
     except Exception as e:
         logger.warning(f"Giphy API error for '{query}': {e}")
     return ""
@@ -300,26 +294,8 @@ async def get_gif(action: str, _tenor_query: str = "") -> str:
     # Use curated fallback — always works
     fallback = AOT_FALLBACK_GIFS.get(action) or AOT_FALLBACK_GIFS.get("transform", [])
     
-    sess = _session()
     if fallback:
-        random.shuffle(fallback)
-        for fb_url in fallback:
-            if await _validate_url(fb_url, sess):
-                return fb_url
+        return random.choice(fallback)
 
     logger.error(f"Failed to fetch any valid GIF for action '{action}'")
     return ""
-
-async def _validate_url(url: str, sess: aiohttp.ClientSession) -> bool:
-    """Check if the URL returns a valid image without downloading the full body."""
-    try:
-        async with sess.head(url, timeout=2.0) as resp:
-            if resp.status == 200 and 'image' in resp.headers.get('Content-Type', ''):
-                return True
-            # Some CDNs block HEAD requests, fallback to GET with stream
-            if resp.status in (405, 403, 501):
-                async with sess.get(url, timeout=2.0) as get_resp:
-                    return get_resp.status == 200 and 'image' in get_resp.headers.get('Content-Type', '')
-    except Exception:
-        pass
-    return False

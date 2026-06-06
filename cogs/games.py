@@ -3,28 +3,10 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import random
-from utils.game_state import GameState, TITANS, CHARACTERS
+from utils.game_state import GameState, TITANS, CHARACTERS, get_titan_image, SURVEY_CORPS_ICON
 from utils.gifs import get_gif
 
-# ── Titan Images — hosted in repo assets/Titans/ ───────────────────────────
-# raw.githubusercontent.com is 100% Discord-embed compatible
-_RAW = "https://raw.githubusercontent.com/subhobhai943/aot-game-discord-bot/main/assets/Titans"
 
-TITAN_IMAGES = {
-    "Pure Titan":       f"{_RAW}/pure_titan.jpg",
-    "Abnormal Titan":   f"{_RAW}/abnormal_titan.jpg",
-    "Jaw Titan":        f"{_RAW}/jaw_titan.jpg",
-    "Cart Titan":       f"{_RAW}/cart_titan.jpg",
-    "Female Titan":     f"{_RAW}/female_titan.jpg",
-    "Armored Titan":    f"{_RAW}/armored_titan.jpg",
-    "Attack Titan":     f"{_RAW}/attack_titan.jpg",
-    "Colossal Titan":   f"{_RAW}/colossal_titan.jpg",
-    "Beast Titan":      f"{_RAW}/beast_titan.jpg",
-    "War Hammer Titan": f"{_RAW}/war_hammer_titan.jpg",
-    "Founding Titan":   f"{_RAW}/founding_titan.jpg",
-}
-
-SURVEY_CORPS_ICON = f"{_RAW}/survey_corps.png"
 
 # AoT Trivia Questions
 TRIVIA_QUESTIONS = [
@@ -33,14 +15,14 @@ TRIVIA_QUESTIONS = [
         "options": ["Tatakae!", "I'll kill them all!", "Freedom!", "Never give up!"],
         "answer": 0,
         "explanation": "Eren Yeager's iconic battle cry throughout the series!",
-        "image": TITAN_IMAGES["Attack Titan"],
+        "image": get_titan_image("Attack Titan"),
     },
     {
         "question": "Which character can use the Founding Titan's power?",
         "options": ["Eren Yeager", "Zeke Yeager", "Rod Reiss", "Both Eren and Zeke"],
         "answer": 3,
         "explanation": "The Founding Titan requires royal blood AND can be used by Eren through his connection to Zeke.",
-        "image": TITAN_IMAGES["Founding Titan"],
+        "image": get_titan_image("Founding Titan"),
     },
     {
         "question": "What is Levi Ackerman's rank?",
@@ -61,21 +43,21 @@ TRIVIA_QUESTIONS = [
         "options": ["Colossal Titan", "Armored Titan", "Attack Titan", "Founding Titan"],
         "answer": 3,
         "explanation": "The Founding Titan holds absolute power over all Titans and the Subjects of Ymir.",
-        "image": TITAN_IMAGES["Founding Titan"],
+        "image": get_titan_image("Founding Titan"),
     },
     {
         "question": "What is the name of Eren's father?",
         "options": ["Grisha Yeager", "Kruger Yeager", "Zeke Yeager", "Keith Shadis"],
         "answer": 0,
         "explanation": "Grisha Yeager is the one who stole the Founding Titan from the Reiss family.",
-        "image": TITAN_IMAGES["Attack Titan"],
+        "image": get_titan_image("Attack Titan"),
     },
     {
         "question": "Which Titan did Annie Leonhart possess?",
         "options": ["Female Titan", "War Hammer Titan", "Cart Titan", "Jaw Titan"],
         "answer": 0,
         "explanation": "Annie was the inheritor of the Female Titan during the 57th Expedition.",
-        "image": TITAN_IMAGES["Female Titan"],
+        "image": get_titan_image("Female Titan"),
     },
     {
         "question": "What does the phrase 'Sasageyo!' mean?",
@@ -89,14 +71,14 @@ TRIVIA_QUESTIONS = [
         "options": ["Hange Zoe", "Armin Arlert", "Historia Reiss", "Ymir Fritz"],
         "answer": 1,
         "explanation": "Armin inherited the Colossal Titan through serum but can transform due to his determination.",
-        "image": TITAN_IMAGES["Colossal Titan"],
+        "image": get_titan_image("Colossal Titan"),
     },
     {
         "question": "What is the Colossal Titan's signature ability?",
         "options": ["Hardening", "Explosive Transformation", "Speed", "Flight"],
         "answer": 1,
         "explanation": "Bertolt Hoover's Colossal Titan creates massive explosions upon transformation!",
-        "image": TITAN_IMAGES["Colossal Titan"],
+        "image": get_titan_image("Colossal Titan"),
     },
 ]
 
@@ -182,7 +164,7 @@ class Games(commands.Cog):
         embed.add_field(name="\u200b",           value="\u200b", inline=True)
         embed.add_field(name="📜 Description", value=data["description"], inline=False)
 
-        titan_img = TITAN_IMAGES.get(result)
+        titan_img = get_titan_image(result)
         if titan_img:
             embed.set_image(url=titan_img)
 
@@ -231,19 +213,19 @@ class Games(commands.Cog):
 
         if percentage >= 90:
             grade, grade_emoji, color = "S Rank! 🏆", "👑", discord.Color.gold()
-            banner = TITAN_IMAGES["Colossal Titan"]
+            banner = get_titan_image("Colossal Titan")
         elif percentage >= 80:
             grade, grade_emoji, color = "A Rank!", "⚡", discord.Color.green()
-            banner = TITAN_IMAGES["Armored Titan"]
+            banner = get_titan_image("Armored Titan")
         elif percentage >= 60:
             grade, grade_emoji, color = "B Rank!", "✅", discord.Color.teal()
-            banner = TITAN_IMAGES["Female Titan"]
+            banner = get_titan_image("Female Titan")
         elif percentage >= 40:
             grade, grade_emoji, color = "C Rank!", "📜", discord.Color.orange()
-            banner = TITAN_IMAGES["Jaw Titan"]
+            banner = get_titan_image("Jaw Titan")
         else:
             grade, grade_emoji, color = "D Rank! 💀", "💀", discord.Color.red()
-            banner = TITAN_IMAGES["Pure Titan"]
+            banner = get_titan_image("Pure Titan")
 
         embed = discord.Embed(
             title=f"🪂 ODM Gear Training — {d['name']} Course",
@@ -274,11 +256,11 @@ class Games(commands.Cog):
     @app_commands.command(name="daily_challenge", description="Get today's AoT daily challenge!")
     async def daily_challenge(self, interaction: discord.Interaction):
         challenges = [
-            {"title": "Titan Slayer",  "desc": "Win a battle against any titan",              "reward": 50,  "image": TITAN_IMAGES["Pure Titan"]},
+            {"title": "Titan Slayer",  "desc": "Win a battle against any titan",              "reward": 50,  "image": get_titan_image("Pure Titan")},
             {"title": "Lore Master",   "desc": "Look up 3 different characters",               "reward": 30,  "image": SURVEY_CORPS_ICON},
             {"title": "ODM Expert",    "desc": "Complete an ODM training course",              "reward": 40,  "image": SURVEY_CORPS_ICON},
             {"title": "Team Player",   "desc": "React to another player's message with a gif", "reward": 20,  "image": SURVEY_CORPS_ICON},
-            {"title": "Scout Elite",   "desc": "Reach a new rank level",                       "reward": 100, "image": TITAN_IMAGES["Beast Titan"]},
+            {"title": "Scout Elite",   "desc": "Reach a new rank level",                       "reward": 100, "image": get_titan_image("Beast Titan")},
         ]
         challenge = random.choice(challenges)
 
@@ -306,22 +288,22 @@ class Games(commands.Cog):
     @app_commands.command(name="aot_fact", description="Get a random Attack on Titan fact!")
     async def aot_fact(self, interaction: discord.Interaction):
         facts = [
-            {"text": "Eren's Titan form is 15 meters tall, the same height as the Attack Titan.",                                   "image": TITAN_IMAGES["Attack Titan"]},
+            {"text": "Eren's Titan form is 15 meters tall, the same height as the Attack Titan.",                                   "image": get_titan_image("Attack Titan")},
             {"text": "Mikasa's scarf is made from the same material as the Scout Regiment cloaks.",                                 "image": SURVEY_CORPS_ICON},
-            {"text": "The Founding Titan can alter or erase the memories of Subjects of Ymir.",                                     "image": TITAN_IMAGES["Founding Titan"]},
+            {"text": "The Founding Titan can alter or erase the memories of Subjects of Ymir.",                                     "image": get_titan_image("Founding Titan")},
             {"text": "Levi's cleaning obsession is so strong he once threatened to break Eren's legs for dirtying the room.",        "image": SURVEY_CORPS_ICON},
-            {"text": "The Colossal Titan can emit steam at will, using it as both offense and defense.",                            "image": TITAN_IMAGES["Colossal Titan"]},
-            {"text": "Armin's strategic mind was recognized even by Erwin Smith, who trusted him with crucial plans.",              "image": TITAN_IMAGES["Colossal Titan"]},
-            {"text": "Reiner's 'Warrior' persona was a coping mechanism for his years of living as a double agent.",               "image": TITAN_IMAGES["Armored Titan"]},
-            {"text": "The Beast Titan's ability to throw objects with precision is unmatched by any other Titan.",                  "image": TITAN_IMAGES["Beast Titan"]},
-            {"text": "Historia Reiss was willing to sacrifice herself to save Eren and humanity.",                                   "image": TITAN_IMAGES["Founding Titan"]},
+            {"text": "The Colossal Titan can emit steam at will, using it as both offense and defense.",                            "image": get_titan_image("Colossal Titan")},
+            {"text": "Armin's strategic mind was recognized even by Erwin Smith, who trusted him with crucial plans.",              "image": get_titan_image("Colossal Titan")},
+            {"text": "Reiner's 'Warrior' persona was a coping mechanism for his years of living as a double agent.",               "image": get_titan_image("Armored Titan")},
+            {"text": "The Beast Titan's ability to throw objects with precision is unmatched by any other Titan.",                  "image": get_titan_image("Beast Titan")},
+            {"text": "Historia Reiss was willing to sacrifice herself to save Eren and humanity.",                                   "image": get_titan_image("Founding Titan")},
             {"text": "Hange Zoë's passion for Titan research led to numerous breakthroughs in Titan biology.",                      "image": SURVEY_CORPS_ICON},
-            {"text": "The War Hammer Titan can create structures and weapons from hardened crystal.",                                "image": TITAN_IMAGES["War Hammer Titan"]},
-            {"text": "Ymir Fritz's connection to the Founding Titan spans over 2,000 years of history.",                           "image": TITAN_IMAGES["Founding Titan"]},
-            {"text": "The Attack Titan can see memories of future inheritors, creating visions of what's to come.",                "image": TITAN_IMAGES["Attack Titan"]},
-            {"text": "Annie Leonhart's crystal hardening ability can preserve her Titan form indefinitely.",                        "image": TITAN_IMAGES["Female Titan"]},
-            {"text": "The Cart Titan's endurance allowed its inheritor to maintain Titan form for months.",                        "image": TITAN_IMAGES["Cart Titan"]},
-            {"text": "The Jaw Titan is the fastest of all Nine Titans due to its small size and agile claws.",                     "image": TITAN_IMAGES["Jaw Titan"]},
+            {"text": "The War Hammer Titan can create structures and weapons from hardened crystal.",                                "image": get_titan_image("War Hammer Titan")},
+            {"text": "Ymir Fritz's connection to the Founding Titan spans over 2,000 years of history.",                           "image": get_titan_image("Founding Titan")},
+            {"text": "The Attack Titan can see memories of future inheritors, creating visions of what's to come.",                "image": get_titan_image("Attack Titan")},
+            {"text": "Annie Leonhart's crystal hardening ability can preserve her Titan form indefinitely.",                        "image": get_titan_image("Female Titan")},
+            {"text": "The Cart Titan's endurance allowed its inheritor to maintain Titan form for months.",                        "image": get_titan_image("Cart Titan")},
+            {"text": "The Jaw Titan is the fastest of all Nine Titans due to its small size and agile claws.",                     "image": get_titan_image("Jaw Titan")},
         ]
         fact = random.choice(facts)
 

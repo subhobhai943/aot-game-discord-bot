@@ -11,7 +11,7 @@ import random
 import discord
 from discord.ext import commands
 from utils.game_state import (
-    GameState, PvPSession, TITAN_STATS, TITAN_IMAGES,
+    GameState, PvPSession, TITAN_STATS, get_titan_image,
     RARITY_COLOR, RARITY_EMOJI, SURVEY_CORPS_ICON, pvp_titan_attack
 )
 
@@ -48,7 +48,7 @@ def _battle_embed(session: PvPSession, log: list[str], c_name: str, o_name: str)
     )
     if log:
         embed.add_field(name="\U0001f4dc Battle Log", value="\n".join(log[-4:]), inline=False)
-    embed.set_thumbnail(url=TITAN_IMAGES.get(c_titan, SURVEY_CORPS_ICON))
+    embed.set_thumbnail(url=get_titan_image(c_titan))
     return embed
 
 
@@ -181,7 +181,7 @@ class PvP(commands.Cog):
             ),
             color=0xFFAA00
         )
-        challenge_embed.set_thumbnail(url=TITAN_IMAGES.get(c_titan, SURVEY_CORPS_ICON))
+        challenge_embed.set_thumbnail(url=get_titan_image(c_titan))
 
         view = ChallengeView(opponent)
         msg  = await ctx.send(embed=challenge_embed, view=view)
@@ -318,7 +318,7 @@ class PvP(commands.Cog):
             ),
             color=0xFFAA00
         )
-        result_embed.set_image(url=TITAN_IMAGES.get(win_titan, SURVEY_CORPS_ICON))
+        result_embed.set_image(url=get_titan_image(win_titan))
         result_embed.set_footer(text=f"Use {prefix}leaderboard to see the rankings!")
         await channel.send(embed=result_embed)
 

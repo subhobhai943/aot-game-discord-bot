@@ -8,8 +8,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from utils.game_state import (
-    GameState, TITAN_STATS, TITAN_IMAGES,
-    RARITY_COLOR, RARITY_EMOJI, SURVEY_CORPS_ICON,
+    GameState, TITAN_STATS, get_titan_image,
     calc_move, titan_ai_move, CHARACTERS,
 )
 
@@ -50,7 +49,7 @@ def _battle_embed(session) -> discord.Embed:
         value=_hp_bar(session.titan_hp, session.titan_max_hp),
         inline=False
     )
-    embed.set_thumbnail(url=TITAN_IMAGES.get(session.titan_name, SURVEY_CORPS_ICON))
+    embed.set_thumbnail(url=get_titan_image(session.titan_name))
     return embed
 
 

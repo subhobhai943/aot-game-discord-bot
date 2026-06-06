@@ -173,7 +173,7 @@ class Gifs(commands.Cog, name="🎭 Reactions"):
     async def yeager(self, ctx, member: discord.Member = None): await self._react(ctx, member, "yeager")
 
     # ── AoT combat & special ─────────────────────────────────────────────
-    @commands.command(name="kill", aliases=["eliminate", "slay"])
+    @commands.command(name="kill", aliases=["slay"])
     async def kill(self, ctx, member: discord.Member = None): await self._react(ctx, member, "kill")
 
     @commands.command(name="odm", aliases=["gear", "odmgear"])

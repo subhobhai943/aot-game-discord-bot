@@ -23,12 +23,27 @@ _PREFIXES: dict[int, str] = {}
 
 
 def get_prefix(bot, message):
+    p = DEFAULT_PREFIX
     if message.guild:
-        p = cogs.settings.get_prefix(message.guild.id)
-        if p != "!":
-            return p
-        return _PREFIXES.get(message.guild.id, DEFAULT_PREFIX)
-    return DEFAULT_PREFIX
+        guild_p = cogs.settings.get_prefix(message.guild.id)
+        if guild_p != "!":
+            p = guild_p
+        elif message.guild.id in _PREFIXES:
+            p = _PREFIXES[message.guild.id]
+    
+    prefixes = [p]
+    # Add variant with space if it doesn't have one, or without if it does
+    if not p.endswith(" "):
+        prefixes.append(f"{p} ")
+    
+    # Add lowercase variants
+    lower_p = p.lower()
+    if lower_p != p:
+        prefixes.append(lower_p)
+        if not lower_p.endswith(" "):
+            prefixes.append(f"{lower_p} ")
+            
+    return commands.when_mentioned_or(*prefixes)(bot, message)
 
 
 COGS = [

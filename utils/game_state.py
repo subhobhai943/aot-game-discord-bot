@@ -10,6 +10,7 @@ import os
 import random
 from dataclasses import dataclass, field, asdict
 from typing import Optional
+from data.titan_images import TITAN_IMAGES as _ALL_TITAN_IMAGES
 
 DATA_FILE        = "data/player_data.json"
 SETTINGS_FILE    = "data/settings.json"
@@ -64,23 +65,14 @@ RARITY_EMOJI = {
     "Common": "⬜", "Uncommon": "🟢", "Rare": "🔵", "Epic": "🟣", "Legendary": "🟡"
 }
 
-# ── Titan Images — external CDN URLs (no local assets needed) ─────────────
-# Using Attack on Titan Wiki / Fandom CDN images.
-# To add more images: just replace any URL here — no files to upload to the repo.
-TITAN_IMAGES = {
-    "Pure Titan":       "https://static.wikia.nocookie.net/shingekinokyojin/images/9/93/Pure_Titans_%28Anime%29.png",
-    "Abnormal Titan":   "https://static.wikia.nocookie.net/shingekinokyojin/images/5/52/Abnormal_Titan_%28Anime%29.png",
-    "Jaw Titan":        "https://static.wikia.nocookie.net/shingekinokyojin/images/3/35/Jaw_Titan_%28Anime%29.png",
-    "Cart Titan":       "https://static.wikia.nocookie.net/shingekinokyojin/images/b/b3/Cart_Titan_%28Anime%29.png",
-    "Female Titan":     "https://static.wikia.nocookie.net/shingekinokyojin/images/5/5b/Female_Titan_%28Anime%29.png",
-    "Armored Titan":    "https://static.wikia.nocookie.net/shingekinokyojin/images/a/a8/Armored_Titan_%28Anime%29.png",
-    "Attack Titan":     "https://static.wikia.nocookie.net/shingekinokyojin/images/7/73/Attack_Titan_%28Anime%29.png",
-    "Colossal Titan":   "https://static.wikia.nocookie.net/shingekinokyojin/images/e/e4/Colossus_Titan_%28Anime%29.png",
-    "Beast Titan":      "https://static.wikia.nocookie.net/shingekinokyojin/images/c/c8/Beast_Titan_%28Anime%29.png",
-    "War Hammer Titan": "https://static.wikia.nocookie.net/shingekinokyojin/images/0/07/War_Hammer_Titan_%28Anime%29.png",
-    "Founding Titan":   "https://static.wikia.nocookie.net/shingekinokyojin/images/7/79/Founding_Titan_%28Anime%29.png",
-}
+# ── Titan Images ──────────────────────────────────────────────────────────
 SURVEY_CORPS_ICON = "https://static.wikia.nocookie.net/shingekinokyojin/images/1/1e/Scout_Regiment_symbol.png"
+
+def get_titan_image(titan_name: str) -> str:
+    images = _ALL_TITAN_IMAGES.get(titan_name)
+    if images:
+        return random.choice(images)
+    return SURVEY_CORPS_ICON
 
 
 @dataclass

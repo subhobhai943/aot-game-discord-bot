@@ -9,7 +9,7 @@ import random
 import discord
 from discord.ext import commands, tasks
 from utils.game_state import (
-    GameState, TITAN_STATS, TITAN_IMAGES, TITAN_WEIGHTS,
+    GameState, TITAN_STATS, TITAN_WEIGHTS, get_titan_image,
     RARITY_COLOR, RARITY_EMOJI, SURVEY_CORPS_ICON
 )
 
@@ -38,7 +38,7 @@ def _spawn_embed(titan_name: str) -> discord.Embed:
         ),
         color=color
     )
-    embed.set_image(url=TITAN_IMAGES.get(titan_name, SURVEY_CORPS_ICON))
+    embed.set_image(url=get_titan_image(titan_name))
     embed.add_field(name="⚔️ ATK",    value=stats["atk"], inline=True)
     embed.add_field(name="🛡️ DEF",    value=stats["def"], inline=True)
     embed.add_field(name="💨 SPD",    value=stats["spd"], inline=True)
@@ -97,7 +97,7 @@ class CatchView(discord.ui.View):
             ),
             color=RARITY_COLOR[rarity]
         )
-        embed.set_image(url=TITAN_IMAGES.get(self.titan_name, SURVEY_CORPS_ICON))
+        embed.set_image(url=get_titan_image(self.titan_name))
         embed.add_field(name="💰 Coins Earned", value="+10",  inline=True)
         embed.add_field(name="⚡ XP Earned",    value="+20",  inline=True)
         embed.add_field(name="🗂️ Total Titans", value=player.total_titans(), inline=True)
@@ -114,7 +114,7 @@ class CatchView(discord.ui.View):
                 description=f"**{self.titan_name}** disappeared back into the wilderness... nobody was fast enough!",
                 color=0xFF3333
             )
-            timeout_embed.set_thumbnail(url=TITAN_IMAGES.get(self.titan_name, SURVEY_CORPS_ICON))
+            timeout_embed.set_thumbnail(url=get_titan_image(self.titan_name))
             await self.channel.send(embed=timeout_embed)
 
 
@@ -242,7 +242,7 @@ class TitanCatch(commands.Cog):
             description=f"**{match}** is now your battle titan!",
             color=RARITY_COLOR[stats["rarity"]]
         )
-        embed.set_thumbnail(url=TITAN_IMAGES.get(match, SURVEY_CORPS_ICON))
+        embed.set_thumbnail(url=get_titan_image(match))
         embed.add_field(name="⚔️ ATK", value=stats["atk"], inline=True)
         embed.add_field(name="🛡️ DEF", value=stats["def"], inline=True)
         embed.add_field(name="❤️ HP",  value=stats["hp"],  inline=True)
@@ -264,7 +264,7 @@ class TitanCatch(commands.Cog):
             description=f"Detailed scouting report on the **{match}**.",
             color=RARITY_COLOR[rarity]
         )
-        embed.set_image(url=TITAN_IMAGES.get(match, SURVEY_CORPS_ICON))
+        embed.set_image(url=get_titan_image(match))
         embed.add_field(name="⭐ Rarity", value=f"{RARITY_EMOJI[rarity]} {rarity}", inline=True)
         embed.add_field(name="❤️ HP",     value=stats["hp"],  inline=True)
         embed.add_field(name="⚔️ ATK",    value=stats["atk"], inline=True)

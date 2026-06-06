@@ -67,6 +67,23 @@ CATEGORIES = [
         ],
     },
     {
+        "id": "among_titans",
+        "label": "🗡️ Titan Shifters",
+        "emoji": "🗡️",
+        "color": 0x34495E,
+        "thumbnail": "https://i.imgur.com/9V9p7hZ.png",
+        "desc": "AoT-themed social deduction game! Find the Titan Shifters before they eat the Survey Corps.",
+        "fields": [
+            ("Aot titan_game create",    "Create a new game lobby"),
+            ("Aot titan_game join",      "Join the active lobby"),
+            ("Aot titan_game start",     "Start the game (Host only)"),
+            ("Aot eliminate @user",      "Eat a crewmate (Titan Shifters only)"),
+            ("Aot meeting",              "Call an emergency meeting to vote"),
+            ("Aot vote @user",           "Vote to execute a suspected shifter"),
+            ("Aot titan_game status",    "Check the game status"),
+        ],
+    },
+    {
         "id": "profile",
         "label": "🧙 Profile",
         "emoji": "🧙",
