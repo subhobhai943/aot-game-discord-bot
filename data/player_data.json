@@ -1,0 +1,81 @@
+{
+  "839400278981738536": {
+    "user_id": "839400278981738536",
+    "username": "LEVI",
+    "scout_name": "Eren Yeager",
+    "level": 1,
+    "xp": 50,
+    "wins": 0,
+    "losses": 1,
+    "kills": 0,
+    "coins": 10,
+    "collection": {
+      "Abnormal Titan": 1
+    },
+    "active_titan": "Abnormal Titan"
+  },
+  "1321085846467903569": {
+    "user_id": "1321085846467903569",
+    "username": "EREN JEAGER",
+    "scout_name": "Eren Yeager",
+    "level": 2,
+    "xp": 180,
+    "wins": 1,
+    "losses": 0,
+    "kills": 1,
+    "coins": 150,
+    "collection": {
+      "Female Titan": 3,
+      "Abnormal Titan": 1,
+      "Armored Titan": 1,
+      "Pure Titan": 3,
+      "Jaw Titan": 2
+    },
+    "active_titan": "Female Titan"
+  },
+  "1093113841736503417": {
+    "user_id": "1093113841736503417",
+    "username": "Aura",
+    "scout_name": "Eren Yeager",
+    "level": 1,
+    "xp": 20,
+    "wins": 0,
+    "losses": 0,
+    "kills": 0,
+    "coins": 10,
+    "collection": {
+      "Cart Titan": 1
+    },
+    "active_titan": "Cart Titan"
+  },
+  "956773141265391676": {
+    "user_id": "956773141265391676",
+    "username": "DaRKeN",
+    "scout_name": "Eren Yeager",
+    "level": 1,
+    "xp": 20,
+    "wins": 0,
+    "losses": 0,
+    "kills": 0,
+    "coins": 10,
+    "collection": {
+      "Cart Titan": 1
+    },
+    "active_titan": "Cart Titan"
+  },
+  "1380905001584431256": {
+    "user_id": "1380905001584431256",
+    "username": "Immortally Dead",
+    "scout_name": "Eren Yeager",
+    "level": 1,
+    "xp": 40,
+    "wins": 0,
+    "losses": 0,
+    "kills": 0,
+    "coins": 20,
+    "collection": {
+      "Abnormal Titan": 2
+    },
+    "active_titan": "Abnormal Titan"
+  }
+}
