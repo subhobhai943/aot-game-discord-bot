@@ -1,8 +1,27 @@
+"""Titan-Game cog — Among Titans social deduction game.
+
+New in this version
+───────────────────
+* BUG FIX  : Kill menu now works for every kill after the first.
+              Root cause was EliminateSelectView being re-created with stale
+              game state. The view now always fetches a fresh game ref and
+              the kill cooldown timestamp is set correctly in titan_logic.
+* FEATURE  : Meeting cooldown — 30 s after a meeting ends before another
+              can be called (both button and /meeting command).
+* FEATURE  : Round system — round counter shown in status/exploration embeds;
+              advances after every vote resolution.
+* FEATURE  : Jigsaw-style AoT tasks replacing boring Q&A. Each task gives a
+              scrambled word/image puzzle the player assembles step by step.
+* FEATURE  : `Aot task` / `/task` command — start a task from the command
+              line instead of the button (works anywhere in the game channel).
+* FEATURE  : GIF reactions for kills, meetings, and game-over events.
+* REMOVED  : Old multiple-choice knowledge quiz tasks.
+"""
 from __future__ import annotations
 
 import asyncio
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import discord
@@ -15,394 +34,419 @@ from utils.game_state import attach_image
 
 GAME_CATEGORY_ID = 1510159583040114788
 
+# ─────────────────────────────────────────────────────────────────────────────
+# GIFs used across the game for atmosphere
+# ─────────────────────────────────────────────────────────────────────────────
+GIF_GAME_START   = "https://media.tenor.com/5DJiIz0RQFIAAAAC/attack-on-titan-aot.gif"
+GIF_KILL         = "https://media.tenor.com/GfNJMjgKQXcAAAAC/attack-on-titan-titan.gif"
+GIF_MEETING      = "https://media.tenor.com/3IUGkiXXPy4AAAAC/attack-on-titan-aot.gif"
+GIF_VOTE_START   = "https://media.tenor.com/VEz6HkPDJnIAAAAC/aot-attack-on-titan.gif"
+GIF_SC_WIN       = "https://media.tenor.com/uwdcBiJFkKkAAAAC/attack-on-titan-levi.gif"
+GIF_TITAN_WIN    = "https://media.tenor.com/KRO_0CcW4PAAAAAC/attack-on-titan-colossal-titan.gif"
+GIF_EXILE        = "https://media.tenor.com/K3_QWwTGEwoAAAAC/attack-on-titan-aot.gif"
+GIF_TASK_DONE    = "https://media.tenor.com/W4iiMFuqS_EAAAAC/attack-on-titan-aot.gif"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# AoT-themed puzzle task bank  (text + multiple-choice + image_url optional)
+# Jigsaw-style tasks
+# Each task is a multi-step puzzle: the player receives a SCRAMBLED word/phrase
+# and must click the correct fragments in order to reconstruct the answer.
+# Step counts: 3–4 steps per task (each step reveals a fragment to pick).
 # ─────────────────────────────────────────────────────────────────────────────
 @dataclass(frozen=True)
-class AoTPuzzleTask:
+class JigsawTask:
     title: str
-    location: str          # in-universe location flavour
-    lore_text: str         # narrative setup
-    question: str
-    choices: tuple[str, ...]
-    answer: str
-    success_msg: str
-    fail_msg: str
-    emoji: str             # decorative
-    image_url: str = ""    # optional image to enrich the task embed
+    location: str
+    setup_text: str          # flavour / context
+    answer_word: str         # the final assembled answer shown on success
+    steps: tuple             # tuple of JigsawStep objects
+    success_gif: str = GIF_TASK_DONE
+    emoji: str = "🧩"
 
 
-AOT_PUZZLE_TASKS: list[AoTPuzzleTask] = [
-    AoTPuzzleTask(
-        title="Nape Strike Protocol",
-        location="Wall Maria — Shiganshina District",
-        lore_text=(
-            "A trainee freezes mid-charge. Titans are closing in and every second counts. "
-            "You must call out the one and only lethal target before the squad's formation collapses."
+@dataclass(frozen=True)
+class JigsawStep:
+    instruction: str         # what the player must do at this step
+    correct_fragment: str    # the one correct piece to pick
+    distractors: tuple       # wrong pieces shown alongside the correct one
+
+
+JIGSAW_TASKS: list[JigsawTask] = [
+    # ── TASK 1 ──────────────────────────────────────────────────────────────
+    JigsawTask(
+        title="Repair the ODM Blueprint",
+        location="Survey Corps Workshop — Wall Rose",
+        setup_text=(
+            "A critical ODM gear schematic was shredded. You must reassemble the label "
+            "on the main propulsion component **piece by piece** before the next expedition."
         ),
-        question="Where is a Titan's only lethal weak point?",
-        choices=("The nape of the neck", "The left ankle", "The chest cavity", "The jaw hinge"),
-        answer="The nape of the neck",
-        success_msg="Sharp call! The squad drives blades through the nape and the titan crumbles.",
-        fail_msg="Wrong. Precious seconds wasted — re-read the combat manual.",
-        emoji="⚔️",
-        image_url="https://i.imgur.com/VJZvzxQ.png",
+        answer_word="GAS CANISTER",
+        steps=(
+            JigsawStep(
+                "**Fragment 1/3 — Pick the correct opening label:**",
+                "⬡ GAS",
+                ("⬡ BLADE", "⬡ WIRE", "⬡ BOLT")
+            ),
+            JigsawStep(
+                "**Fragment 2/3 — Pick the middle connector:**",
+                "◈ [—]",
+                ("◈ [///]", "◈ [≈]", "◈ [✗]")
+            ),
+            JigsawStep(
+                "**Fragment 3/3 — Complete the component name:**",
+                "⬡ CANISTER",
+                ("⬡ TANK", "⬡ PACK", "⬡ BARREL")
+            ),
+        ),
+        emoji="🔧",
     ),
-    AoTPuzzleTask(
-        title="Flare Signal Cipher",
-        location="Survey Corps Forward Camp",
-        lore_text=(
-            "Smoke fills the tree line and visual contact with the rear squad is lost. "
-            "Signal protocol: Green = regroup, Red = attack, Black = retreat. "
-            "The rear squad is scattered and needs to reform NOW."
+    # ── TASK 2 ──────────────────────────────────────────────────────────────
+    JigsawTask(
+        title="Decode the Recon Cipher",
+        location="Survey Corps Forward Base — Forest of Giant Trees",
+        setup_text=(
+            "A coded recon message arrived. The cipher key was lost but the letters "
+            "are still visible — just scrambled. "
+            "Reconstruct **THE NAPE** in the correct slot order."
         ),
-        question="Which flare do you fire to regroup the rear squad?",
-        choices=("Green flare", "Red flare", "Black smoke canister", "Blue flare"),
-        answer="Green flare",
-        success_msg="The green arc cuts through the smoke and the squad reforms perfectly.",
-        fail_msg="Wrong signal. The squad receives a contradictory order — check the flare book.",
-        emoji="🟢",
+        answer_word="THE NAPE",
+        steps=(
+            JigsawStep(
+                "**Slot 1/3 — Which tile goes FIRST?**",
+                "[T]",
+                ("[N]", "[E]", "[P]")
+            ),
+            JigsawStep(
+                "**Slot 2/3 — Which tile follows?**",
+                "[H]",
+                ("[A]", "[E]", "[T]")
+            ),
+            JigsawStep(
+                "**Slot 3/3 — Final tile?**",
+                "[E]",
+                ("[N]", "[P]", "[A]")
+            ),
+        ),
+        emoji="🔐",
     ),
-    AoTPuzzleTask(
-        title="Thunder Spear Requisition",
-        location="Trost District Armoury",
-        lore_text=(
-            "A forward unit is pinned on the rooftops, ODM gear nearly empty. "
-            "Four crates sit in front of you. Only one holds the gear they desperately need."
+    # ── TASK 3 ──────────────────────────────────────────────────────────────
+    JigsawTask(
+        title="Seal the Breach Blueprint",
+        location="Shiganshina District — Wall Maria Gate",
+        setup_text=(
+            "The gate engineers gave you a torn diagram of the sealing procedure. "
+            "Slot the **four action tiles** into the correct sequence to seal the wall."
         ),
-        question="Which crate does the squad need immediately?",
-        choices=("Thunder Spears", "Tea Rations", "Ceremonial Cloaks", "Broken Scabbards"),
-        answer="Thunder Spears",
-        success_msg="You haul the correct crate up. The vanguard breaks through the titan line!",
-        fail_msg="Wrong crate. The quartermaster shouts for the live ordnance shipment.",
-        emoji="💥",
-    ),
-    AoTPuzzleTask(
-        title="Convoy Escape Route",
-        location="Stohess District",
-        lore_text=(
-            "Titans are spotted massing to the **west**. Rooftops are collapsing to the **south**. "
-            "An urgent Field Scout confirmed the **east ridge** is still clear. "
-            "The refugee convoy is waiting for your order."
+        answer_word="PLUG → BRACE → WELD → SEAL",
+        steps=(
+            JigsawStep(
+                "**Step 1/4 — First action to secure the breach:**",
+                "PLUG the gap",
+                ("WELD the frame", "SEAL the gate", "BRACE the arch")
+            ),
+            JigsawStep(
+                "**Step 2/4 — Next reinforcement action:**",
+                "BRACE the arch",
+                ("PLUG the gap", "WELD the frame", "SEAL the gate")
+            ),
+            JigsawStep(
+                "**Step 3/4 — Bonding action:**",
+                "WELD the frame",
+                ("SEAL the gate", "PLUG the gap", "BRACE the arch")
+            ),
+            JigsawStep(
+                "**Step 4/4 — Final closure:**",
+                "SEAL the gate",
+                ("BRACE the arch", "WELD the frame", "PLUG the gap")
+            ),
         ),
-        question="Which route do you send the convoy through?",
-        choices=("East Ridge", "West Alley", "South Market", "North Gate Rubble"),
-        answer="East Ridge",
-        success_msg="The convoy slips through the east ridge and reaches the inner wall safely.",
-        fail_msg="That route is compromised. Re-read the field scout's report.",
-        emoji="🗺️",
-    ),
-    AoTPuzzleTask(
-        title="Survey Corps Regiment Identification",
-        location="Military HQ — Wall Sina",
-        lore_text=(
-            "A messenger delivers orders but the regimental seal has been smudged. "
-            "You must identify the emblem of the Survey Corps from the list of military seals "
-            "to confirm the document's legitimacy."
-        ),
-        question="What is the symbol of the Survey Corps?",
-        choices=("Wings of Freedom", "Rose Crest", "Shield of the King", "Garrison Blade"),
-        answer="Wings of Freedom",
-        success_msg="Correct emblem confirmed. The orders are legitimate — the expedition proceeds!",
-        fail_msg="Wrong seal. That's a forgery — report to the commander immediately.",
-        emoji="🦅",
-    ),
-    AoTPuzzleTask(
-        title="Founding Titan's Power",
-        location="Paradis Island — Underground Vault",
-        lore_text=(
-            "Ancient texts recovered from a hidden vault describe the power of the "
-            "Founding Titan. An intelligence operative asks you to confirm what unique ability "
-            "sets it apart from all other Titan forms."
-        ),
-        question="What is the unique power of the Founding Titan?",
-        choices=(
-            "Control and memory wipe of all Subjects of Ymir",
-            "Transform any human into a Pure Titan",
-            "Harden skin into impenetrable crystal armour",
-            "Summon walls from the earth",
-        ),
-        answer="Control and memory wipe of all Subjects of Ymir",
-        success_msg="Correct. The intelligence is verified and the mission plan updated accordingly.",
-        fail_msg="Incorrect. That describes a different Titan power — check your notes.",
-        emoji="👑",
-    ),
-    AoTPuzzleTask(
-        title="ODM Gas Pressure Check",
-        location="Wall Rose — Training Grounds",
-        lore_text=(
-            "Before launch a trainee asks you the minimum gas pressure needed for safe ODM "
-            "traversal in urban terrain. The training manual lists it clearly — get it right "
-            "or the wire won't hold at speed."
-        ),
-        question="Which ODM component stores the compressed gas used for movement?",
-        choices=("The gas canister", "The blade cartridge", "The anchor hook", "The belt harness"),
-        answer="The gas canister",
-        success_msg="Correct. Pressure confirmed nominal. The trainee deploys safely.",
-        fail_msg="Wrong component. The trainee's gear nearly fails mid-swing!",
-        emoji="💨",
-    ),
-    AoTPuzzleTask(
-        title="Which Wall Fell First?",
-        location="Survey Corps Archive — Trost",
-        lore_text=(
-            "During a history debrief, a junior officer asks you which of the three concentric "
-            "walls was breached first by the Colossal and Armoured Titans, triggering the "
-            "fall that changed everything."
-        ),
-        question="Which wall was breached on the day of the fall?",
-        choices=("Wall Maria", "Wall Rose", "Wall Sina", "Wall Paradis"),
-        answer="Wall Maria",
-        success_msg="Correct. Wall Maria fell that day — history confirmed for the debrief.",
-        fail_msg="Incorrect. Check the archive dates. The sequence matters.",
         emoji="🧱",
     ),
-    AoTPuzzleTask(
-        title="Ackerman Bloodline Trait",
-        location="Ackerman Estate Records",
-        lore_text=(
-            "A government official is questioning the Ackerman family records. "
-            "You need to state the known military trait of the Ackerman bloodline "
-            "to confirm the file is accurate."
+    # ── TASK 4 ──────────────────────────────────────────────────────────────
+    JigsawTask(
+        title="Reconstruct the Flare Code",
+        location="Survey Corps Signal Tower",
+        setup_text=(
+            "The flare codebook got wet and the ink ran. "
+            "Match the **correct colour fragment** to each signal meaning:"
         ),
-        question="What special trait does the Ackerman bloodline possess?",
-        choices=(
-            "They can access all combat experience of past Ackermans",
-            "They can transform into Pure Titans at will",
-            "They are immune to all Titan powers",
-            "They can read the memories of Titan Shifters",
+        answer_word="GREEN=REGROUP, RED=ATTACK, BLACK=RETREAT",
+        steps=(
+            JigsawStep(
+                "**Signal 1/3 — 'REGROUP' corresponds to which colour?**",
+                "🟢 GREEN",
+                ("🔴 RED", "⚫ BLACK", "🔵 BLUE")
+            ),
+            JigsawStep(
+                "**Signal 2/3 — 'ATTACK' corresponds to which colour?**",
+                "🔴 RED",
+                ("🟢 GREEN", "🔵 BLUE", "⚫ BLACK")
+            ),
+            JigsawStep(
+                "**Signal 3/3 — 'RETREAT' corresponds to which colour?**",
+                "⚫ BLACK",
+                ("🔴 RED", "🟢 GREEN", "🔵 BLUE")
+            ),
         ),
-        answer="They can access all combat experience of past Ackermans",
-        success_msg="File confirmed accurate. The Ackerman record stands unchallenged.",
-        fail_msg="Wrong trait listed — the official flags the file as falsified.",
+        emoji="🚨",
+    ),
+    # ── TASK 5 ──────────────────────────────────────────────────────────────
+    JigsawTask(
+        title="Reassemble the Garrison Map",
+        location="Trost District Command Room",
+        setup_text=(
+            "The defensive map of Trost was torn into four quadrants. "
+            "Arrange the **zone labels** in correct compass order: N → E → S → W."
+        ),
+        answer_word="NORTH → EAST → SOUTH → WEST",
+        steps=(
+            JigsawStep(
+                "**Quadrant 1/4 — Which zone is NORTH?**",
+                "🔼 Inner Wall Gate",
+                ("🔼 Rooftop Market", "🔼 East Barracks", "🔼 Outer Ridge")
+            ),
+            JigsawStep(
+                "**Quadrant 2/4 — Which zone is EAST?**",
+                "▶ East Barracks",
+                ("▶ Inner Wall Gate", "▶ West Garrison", "▶ Outer Ridge")
+            ),
+            JigsawStep(
+                "**Quadrant 3/4 — Which zone is SOUTH?**",
+                "🔽 Outer Ridge",
+                ("🔽 Inner Wall Gate", "🔽 East Barracks", "🔽 Rooftop Market")
+            ),
+            JigsawStep(
+                "**Quadrant 4/4 — Which zone is WEST?**",
+                "◀ West Garrison",
+                ("◀ Outer Ridge", "◀ Inner Wall Gate", "◀ East Barracks")
+            ),
+        ),
+        emoji="🗺️",
+    ),
+    # ── TASK 6 ──────────────────────────────────────────────────────────────
+    JigsawTask(
+        title="Restore the Titan Sketch",
+        location="Survey Corps Research Lab",
+        setup_text=(
+            "A scientist's sketch of the Survey Corps emblem was scrambled. "
+            "Click the correct puzzle pieces **in order** to restore the Wings of Freedom."
+        ),
+        answer_word="WINGS OF FREEDOM",
+        steps=(
+            JigsawStep(
+                "**Piece 1/3 — Left wing fragment:**",
+                "◤ Left Wing",
+                ("◤ Left Claw", "◤ Left Fin", "◤ Left Scale")
+            ),
+            JigsawStep(
+                "**Piece 2/3 — Centre body fragment:**",
+                "◆ Eagle Crest",
+                ("◆ Sword Cross", "◆ Rose Seal", "◆ Crown Crest")
+            ),
+            JigsawStep(
+                "**Piece 3/3 — Right wing fragment:**",
+                "◥ Right Wing",
+                ("◥ Right Claw", "◥ Right Fin", "◥ Right Scale")
+            ),
+        ),
+        emoji="🦅",
+    ),
+    # ── TASK 7 ──────────────────────────────────────────────────────────────
+    JigsawTask(
+        title="Rebuild the Thunder Spear Casing",
+        location="Armament Depot — Fort Salta",
+        setup_text=(
+            "A thunder spear casing fell and the component labels detached. "
+            "Reassemble the weapon label in **assembly order**: tip → shaft → trigger."
+        ),
+        answer_word="TIP → SHAFT → TRIGGER",
+        steps=(
+            JigsawStep(
+                "**Component 1/3 — Explosive tip:**",
+                "💥 WARHEAD TIP",
+                ("💥 GRIP HANDLE", "💥 LAUNCH TUBE", "💥 TRIGGER RING")
+            ),
+            JigsawStep(
+                "**Component 2/3 — Main body:**",
+                "📏 SHAFT TUBE",
+                ("📏 WARHEAD TIP", "📏 TRIGGER RING", "📏 GAS VENT")
+            ),
+            JigsawStep(
+                "**Component 3/3 — Activation piece:**",
+                "🔘 TRIGGER RING",
+                ("🔘 SHAFT TUBE", "🔘 WARHEAD TIP", "🔘 GAS VENT")
+            ),
+        ),
+        emoji="💥",
+    ),
+    # ── TASK 8 ──────────────────────────────────────────────────────────────
+    JigsawTask(
+        title="Decipher the Ackerman File",
+        location="Military Police Archive — Wall Sina",
+        setup_text=(
+            "The Ackerman bloodline file has been deliberately scrambled by royal agents. "
+            "Restore the **three key facts** in the correct order."
+        ),
+        answer_word="PROTECT → AWAKEN → INSTINCT",
+        steps=(
+            JigsawStep(
+                "**Record 1/3 — The Ackerman's primary drive is to:**",
+                "PROTECT their host",
+                ("OBEY the crown", "SENSE danger nearby", "UNLOCK past memories")
+            ),
+            JigsawStep(
+                "**Record 2/3 — Their power activates when:**",
+                "AWAKEN under extreme will",
+                ("PROTECT their host", "OBEY the crown", "UNLOCK past memories")
+            ),
+            JigsawStep(
+                "**Record 3/3 — The trait gives access to:**",
+                "INSTINCT of past Ackermans",
+                ("AWAKEN under extreme will", "SENSE danger nearby", "PROTECT their host")
+            ),
+        ),
         emoji="🩸",
-    ),
-    AoTPuzzleTask(
-        title="Year of the Walls",
-        location="Royal Palace Library",
-        lore_text=(
-            "A cipher from the royal palace uses the year the Walls were completed as the "
-            "key to decrypt a critical message. You must recall the correct year to proceed."
-        ),
-        question="Approximately how many years before the story began were the Walls constructed?",
-        choices=("~100 years ago", "~50 years ago", "~200 years ago", "~10 years ago"),
-        answer="~100 years ago",
-        success_msg="Cipher cracked! The message decrypts and reveals the enemy's next target.",
-        fail_msg="Wrong key — the cipher stays locked and the message is lost.",
-        emoji="📜",
-    ),
-    AoTPuzzleTask(
-        title="Rumbling Activation Condition",
-        location="Fort Salta",
-        lore_text=(
-            "A military strategist asks what is required to activate the Rumbling — "
-            "the ultimate weapon hidden within the Walls — before deciding whether "
-            "to attempt sabotage or evacuation."
-        ),
-        question="What is required to activate the Rumbling?",
-        choices=(
-            "A royal-blooded Founding Titan must activate it",
-            "Any Titan Shifter can activate it with enough power",
-            "The king's seal and a majority vote of the military",
-            "Consuming the power of all Nine Titans",
-        ),
-        answer="A royal-blooded Founding Titan must activate it",
-        success_msg="Correct intelligence. The strategist updates the evacuation plan immediately.",
-        fail_msg="Incorrect. The strategist makes a fatal miscalculation.",
-        emoji="🌍",
-    ),
-    AoTPuzzleTask(
-        title="Titan Transformation Requirement",
-        location="Shiganshina — Underground Chamber",
-        lore_text=(
-            "A Titan Shifter has been captured for questioning. The interrogator needs "
-            "to know under what physical condition a Shifter can trigger their transformation "
-            "to properly plan containment."
-        ),
-        question="What physical requirement triggers a Titan Shifter's transformation?",
-        choices=(
-            "Self-inflicted injury combined with a strong will or intent",
-            "Eating another Titan Shifter",
-            "Exposure to sunlight for 30 continuous minutes",
-            "Reaching a state of complete emotional calm",
-        ),
-        answer="Self-inflicted injury combined with a strong will or intent",
-        success_msg="Containment protocol updated. The Shifter is properly restrained.",
-        fail_msg="Wrong condition — the containment plan has a fatal flaw.",
-        emoji="🔥",
     ),
 ]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Legacy quick-challenge (used as fallback if puzzle bank is exhausted)
+# Jigsaw View — multi-step interactive puzzle
 # ─────────────────────────────────────────────────────────────────────────────
-@dataclass(frozen=True)
-class TaskChallenge:
-    title: str
-    briefing: str
-    prompt: str
-    options: tuple[str, ...]
-    correct_option: str
-    success_text: str
-    failure_text: str
-
-
-def shuffled_options(*items: str) -> tuple[str, ...]:
-    options = list(items)
-    random.shuffle(options)
-    return tuple(options)
-
-
-def build_task_challenge() -> TaskChallenge:
-    templates = [
-        TaskChallenge(
-            title="ODM Supply Dash",
-            briefing="A forward squad is pinned on the rooftops and needs fresh gear immediately.",
-            prompt="Which crate reaches them first?",
-            options=shuffled_options("Thunder Spears", "Tea Rations", "Ceremonial Cloaks", "Broken Scabbards"),
-            correct_option="Thunder Spears",
-            success_text="You secure the thunder spears and the vanguard breaks through the titan line.",
-            failure_text="Wrong crate. The quartermaster shouts for the live ordnance shipment.",
-        ),
-        TaskChallenge(
-            title="Scout Flare Cipher",
-            briefing="The signal book says green means regroup, red means attack, and black smoke means retreat.",
-            prompt="Which flare do you fire to regroup the squad?",
-            options=shuffled_options("Green Flare", "Red Flare", "Black Smoke", "Blue Flare"),
-            correct_option="Green Flare",
-            success_text="Your flare arcs overhead and the nearby scouts reform their line perfectly.",
-            failure_text="That signal would send the wrong order. Check the flare book again.",
-        ),
-        TaskChallenge(
-            title="Titan Weak Point Briefing",
-            briefing="A trainee panics during the charge and asks where the strike must land.",
-            prompt="Call out the true weak point.",
-            options=shuffled_options("The Nape", "The Left Ankle", "The Chest Plate", "The Jaw Hinge"),
-            correct_option="The Nape",
-            success_text="Your call is sharp and clear. The squad slices the nape cleanly.",
-            failure_text="That target wastes precious time. The weak point is smaller and deadlier than that.",
-        ),
-        TaskChallenge(
-            title="Refugee Route Planning",
-            briefing="Titans were spotted to the west, rooftops are collapsing to the south, and the east ridge is still clear.",
-            prompt="Which route do you assign to the convoy?",
-            options=shuffled_options("East Ridge", "West Alley", "South Market", "North Gate Rubble"),
-            correct_option="East Ridge",
-            success_text="The convoy slips through the east ridge and reaches safety before the next titan wave.",
-            failure_text="That route is compromised. Recheck the field report and choose the clear path.",
-        ),
-    ]
-    return random.choice(templates)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# UI Views
-# ─────────────────────────────────────────────────────────────────────────────
-class AoTPuzzleChoiceButton(discord.ui.Button):
-    def __init__(self, label: str, is_correct: bool):
+class JigsawStepButton(discord.ui.Button):
+    def __init__(self, label: str, is_correct: bool, step_index: int):
         super().__init__(label=label, style=discord.ButtonStyle.secondary)
         self.is_correct = is_correct
+        self.step_index = step_index
 
     async def callback(self, interaction: discord.Interaction):
-        assert isinstance(self.view, AoTPuzzleView)
-        await self.view.handle_choice(interaction, self.label, self.is_correct)
+        assert isinstance(self.view, JigsawTaskView)
+        await self.view.handle_pick(interaction, self.label, self.is_correct)
 
 
-class AoTPuzzleView(discord.ui.View):
-    """Rich interactive puzzle view for a single AoT-themed task."""
+class JigsawTaskView(discord.ui.View):
+    """Multi-step jigsaw puzzle. Each step presents fragment buttons."""
 
     def __init__(
         self,
         cog: "TitanGameCog",
         game_channel_id: int,
         player_id: int,
-        task: AoTPuzzleTask,
+        task: JigsawTask,
     ):
-        super().__init__(timeout=120)
+        super().__init__(timeout=180)
         self.cog = cog
         self.game_channel_id = game_channel_id
         self.player_id = player_id
         self.task = task
-        self.answered = False
+        self.current_step: int = 0
+        self.wrong_picks: int = 0
+        self._load_step_buttons()
 
-        shuffled = list(task.choices)
-        random.shuffle(shuffled)
-        for choice in shuffled:
-            self.add_item(AoTPuzzleChoiceButton(label=choice, is_correct=(choice == task.answer)))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.player_id:
-            await interaction.response.send_message(
-                "🔒 This task board is sealed to the scout who opened it.", ephemeral=True
+    def _load_step_buttons(self) -> None:
+        self.clear_items()
+        step = self.task.steps[self.current_step]
+        choices = [step.correct_fragment] + list(step.distractors)
+        random.shuffle(choices)
+        for choice in choices:
+            self.add_item(
+                JigsawStepButton(
+                    label=choice,
+                    is_correct=(choice == step.correct_fragment),
+                    step_index=self.current_step,
+                )
             )
-            return False
-        return True
 
-    def build_task_embed(self, note: Optional[str] = None) -> discord.Embed:
+    def _progress_bar(self) -> str:
+        total = len(self.task.steps)
+        filled = self.current_step
+        return "🟩" * filled + "⬜" * (total - filled) + f" {filled}/{total}"
+
+    def build_embed(self, note: Optional[str] = None) -> discord.Embed:
         game = self.cog.get_game_by_temp_channel(self.game_channel_id)
+        step = self.task.steps[self.current_step]
+
         embed = discord.Embed(
             title=f"{self.task.emoji}  {self.task.title}",
             color=discord.Color.dark_orange(),
         )
         embed.add_field(name="📍 Location", value=self.task.location, inline=False)
-        embed.add_field(name="📖 Briefing", value=self.task.lore_text, inline=False)
-        embed.add_field(name="❓ Question", value=self.task.question, inline=False)
+        embed.add_field(name="📖 Mission", value=self.task.setup_text, inline=False)
+        embed.add_field(name="🧩 Puzzle Progress", value=self._progress_bar(), inline=False)
+        embed.add_field(name="👇 Your Turn", value=step.instruction, inline=False)
+
+        if self.wrong_picks > 0:
+            embed.add_field(
+                name="⚠️ Wrong picks",
+                value=f"❌ × {self.wrong_picks} — keep trying!",
+                inline=False,
+            )
 
         if game:
-            player = game.players.get(self.player_id)
-            completed, required = game.get_task_progress()
-            personal = player.tasks_completed if player else 0
+            p = game.players.get(self.player_id)
+            done, req = game.get_task_progress()
+            personal = p.tasks_completed if p else 0
             embed.add_field(
-                name="📊 Task Progress",
+                name="📊 Progress",
                 value=(
-                    f"Your tasks: **{personal}/{game.TASKS_PER_PLAYER}** \n"
-                    f"Squad total: **{completed}/{required or game.total_tasks_required}**"
+                    f"Your tasks: **{personal}/{game.TASKS_PER_PLAYER}**\n"
+                    f"Squad: **{done}/{req or game.total_tasks_required}**"
                 ),
                 inline=False,
             )
         if note:
-            embed.add_field(name="📢 Intel", value=note, inline=False)
-        if self.task.image_url:
-            embed.set_image(url=self.task.image_url)
-        embed.set_footer(text="Choose wisely — the walls depend on it.")
+            embed.add_field(name="📢 Note", value=note, inline=False)
+        embed.set_footer(text=f"Round {game.round_number if game else '—'} • Piece together the truth!")
         return embed
 
-    async def handle_choice(self, interaction: discord.Interaction, label: str, is_correct: bool):
-        if self.answered:
-            await interaction.response.send_message("You already answered this task.", ephemeral=True)
-            return
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.player_id:
+            await interaction.response.send_message(
+                "🔒 This puzzle board is locked to the scout who opened it.", ephemeral=True
+            )
+            return False
+        return True
 
-        game = self.cog.get_game_by_temp_channel(self.game_channel_id)
-        if not game:
+    async def handle_pick(self, interaction: discord.Interaction, label: str, is_correct: bool):
+        if not is_correct:
+            self.wrong_picks += 1
             await interaction.response.edit_message(
-                content="This task expired — the game is no longer active.", embed=None, view=None
+                embed=self.build_embed("❌ Wrong piece! Try again."), view=self
             )
             return
 
-        if not is_correct:
-            embed = self.build_task_embed(f"❌ {self.task.fail_msg}")
-            embed.color = discord.Color.red()
-            await interaction.response.edit_message(embed=embed, view=self)
+        self.current_step += 1
+
+        if self.current_step < len(self.task.steps):
+            # Advance to next step
+            self._load_step_buttons()
+            await interaction.response.edit_message(
+                embed=self.build_embed("✅ Correct piece! Keep going."), view=self
+            )
             return
 
-        self.answered = True
+        # All steps complete — submit task
+        game = self.cog.get_game_by_temp_channel(self.game_channel_id)
+        if not game:
+            await interaction.response.edit_message(
+                content="This puzzle expired — the game ended.", embed=None, view=None
+            )
+            return
+
         self.stop()
         success, msg = game.do_task(self.player_id)
-        completed, required = game.get_task_progress()
+        done, req = game.get_task_progress()
 
         result = discord.Embed(
             title=f"✅ {self.task.title} — Complete!",
             description=(
-                f"{self.task.success_msg}\n\n"
+                f"🧩 **{self.task.answer_word}** reconstructed successfully!\n\n"
                 f"**{msg}**\n"
-                f"Squad task progress: **{completed}/{required or game.total_tasks_required}**"
+                f"Squad progress: **{done}/{req or game.total_tasks_required}**"
             ),
             color=discord.Color.green(),
         )
-        if self.task.image_url:
-            result.set_image(url=self.task.image_url)
+        result.set_image(url=self.task.success_gif)
+        result.set_footer(text=f"Round {game.round_number} • Wrong guesses: {self.wrong_picks}")
         await interaction.response.edit_message(embed=result, view=None)
 
         if not success:
@@ -410,167 +454,120 @@ class AoTPuzzleView(discord.ui.View):
 
         winner = game.check_win()
         if winner:
-            active_channel = self.cog.get_active_channel(game)
-            if active_channel:
-                await self.cog.end_game(active_channel, game, winner)
+            ch = self.cog.get_active_channel(game)
+            if ch:
+                await self.cog.end_game(ch, game, winner)
 
 
-class TaskChoiceButton(discord.ui.Button):
-    def __init__(self, option_text: str):
-        super().__init__(label=option_text, style=discord.ButtonStyle.secondary)
-        self.option_text = option_text
-
-    async def callback(self, interaction: discord.Interaction):
-        assert isinstance(self.view, TitanTaskChallengeView)
-        await self.view.handle_choice(interaction, self.option_text)
-
-
+# ─────────────────────────────────────────────────────────────────────────────
+# Lobby View
+# ─────────────────────────────────────────────────────────────────────────────
 class TitanLobbyView(discord.ui.View):
     def __init__(self, cog: "TitanGameCog", channel_id: int):
         super().__init__(timeout=None)
         self.cog = cog
         self.channel_id = channel_id
 
-    @discord.ui.button(label="Join Lobby", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="⚔️ Join Lobby", style=discord.ButtonStyle.primary)
     async def join_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         game = self.cog.get_lobby_game(self.channel_id)
         if not game:
             await interaction.response.send_message("Lobby not found.", ephemeral=True)
             return
-
         success, msg = game.add_player(interaction.user.id)
         if not success:
             await interaction.response.send_message(msg, ephemeral=True)
             return
-
         await interaction.message.edit(embed=self.cog.build_lobby_embed(game), view=self)
         await interaction.response.send_message(
-            f"You joined the squad. ({len(game.players)}/{game.MAX_PLAYERS})",
+            f"✅ You joined the squad. ({len(game.players)}/{game.MAX_PLAYERS})",
             ephemeral=True,
         )
 
 
-class TitanTaskChallengeView(discord.ui.View):
-    def __init__(self, cog: "TitanGameCog", game_channel_id: int, player_id: int, challenge: TaskChallenge):
-        super().__init__(timeout=90)
-        self.cog = cog
-        self.game_channel_id = game_channel_id
-        self.player_id = player_id
-        self.challenge = challenge
-
-        for option in challenge.options:
-            self.add_item(TaskChoiceButton(option))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.player_id:
-            await interaction.response.send_message("This task board is locked to the scout who opened it.", ephemeral=True)
-            return False
-        return True
-
-    def build_embed(self, note: Optional[str] = None) -> discord.Embed:
-        game = self.cog.get_game_by_temp_channel(self.game_channel_id)
-        embed = discord.Embed(title=self.challenge.title, color=discord.Color.blurple())
-        embed.description = f"{self.challenge.briefing}\n\n{self.challenge.prompt}"
-        if game:
-            player = game.players.get(self.player_id)
-            completed, required = game.get_task_progress()
-            personal = player.tasks_completed if player else 0
-            embed.add_field(
-                name="Task Progress",
-                value=(
-                    f"Personal: {personal}/{game.TASKS_PER_PLAYER}\n"
-                    f"Squad: {completed}/{required or game.total_tasks_required}"
-                ),
-                inline=False,
-            )
-        if note:
-            embed.add_field(name="Intel", value=note, inline=False)
-        return embed
-
-    async def handle_choice(self, interaction: discord.Interaction, option_text: str):
-        game = self.cog.get_game_by_temp_channel(self.game_channel_id)
-        if not game:
-            await interaction.response.edit_message(content="This task has expired because the game is no longer active.", embed=None, view=None)
-            return
-
-        if option_text != self.challenge.correct_option:
-            await interaction.response.edit_message(embed=self.build_embed(self.challenge.failure_text), view=self)
-            return
-
-        success, msg = game.do_task(self.player_id)
-        completed, required = game.get_task_progress()
-        color = discord.Color.green() if success else discord.Color.red()
-        result = discord.Embed(
-            title=f"{self.challenge.title} Complete" if success else self.challenge.title,
-            description=(
-                f"{self.challenge.success_text}\n\n{msg}\n"
-                f"Squad task progress: {completed}/{required or game.total_tasks_required}"
-            ) if success else msg,
-            color=color,
-        )
-        await interaction.response.edit_message(embed=result, view=None)
-
-        if not success:
-            return
-
-        winner = game.check_win()
-        if winner:
-            active_channel = self.cog.get_active_channel(game)
-            if active_channel:
-                await self.cog.end_game(active_channel, game, winner)
-
-
+# ─────────────────────────────────────────────────────────────────────────────
+# Eliminate select — BUG FIX: always fetches fresh game ref, re-shows after bad kill
+# ─────────────────────────────────────────────────────────────────────────────
 class EliminateSelectView(discord.ui.View):
-    def __init__(self, cog: "TitanGameCog", game: TitanGameEngine, shifter_id: int):
+    def __init__(self, cog: "TitanGameCog", game_channel_id: int, shifter_id: int):
         super().__init__(timeout=60)
         self.cog = cog
-        self.game = game
+        self.game_channel_id = game_channel_id
         self.shifter_id = shifter_id
+        self._refresh_options()
 
+    def _refresh_options(self) -> None:
+        """Rebuild the select menu with currently alive Survey Corps."""
+        self.clear_items()
+        game = self.cog.get_game_by_temp_channel(self.game_channel_id)
+        if not game:
+            self.add_item(discord.ui.Button(label="No active game", disabled=True))
+            return
         options = [
-            discord.SelectOption(label=player.character_name, value=str(user_id), description=f"Eliminate <@{user_id}>")
-            for user_id, player in game.players.items()
-            if player.is_alive and player.role == Role.SURVEY_CORPS
+            discord.SelectOption(
+                label=p.character_name,
+                value=str(uid),
+                description=f"User: {uid}",
+            )
+            for uid, p in game.players.items()
+            if p.is_alive and p.role == Role.SURVEY_CORPS
         ]
-
         if not options:
             self.add_item(discord.ui.Button(label="No valid targets", disabled=True))
             return
-
-        select = discord.ui.Select(placeholder="Choose a Survey Corps target...", options=options[:25])
-        select.callback = self.select_cb
-        self.add_item(select)
+        sel = discord.ui.Select(
+            placeholder="Choose a Survey Corps target…",
+            options=options[:25],
+        )
+        sel.callback = self.select_cb
+        self.add_item(sel)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.shifter_id:
-            await interaction.response.send_message("This control panel is bound to another Titan Shifter.", ephemeral=False)
+            await interaction.response.send_message(
+                "This panel belongs to another shifter.", ephemeral=True
+            )
             return False
         return True
 
     async def select_cb(self, interaction: discord.Interaction):
-        target_id = int(interaction.data["values"][0])
-        success, msg = self.game.eliminate(self.shifter_id, target_id)
-        if not success:
-            await interaction.response.edit_message(content=msg, view=None)
+        # Always fetch the LATEST game state — fixes the stale-ref kill bug
+        game = self.cog.get_game_by_temp_channel(self.game_channel_id)
+        if not game:
+            await interaction.response.edit_message(content="Game no longer active.", view=None)
             return
 
-        await interaction.response.edit_message(content=msg, view=None)
+        target_id = int(interaction.data["values"][0])
+        success, msg = game.eliminate(self.shifter_id, target_id)
+        if not success:
+            await interaction.response.edit_message(content=msg, view=self)
+            return
 
-        active_channel = self.cog.get_active_channel(self.game)
+        # Kill succeeded — close menu and post kill notice
+        await interaction.response.edit_message(
+            content=f"💀 {msg}", view=None
+        )
+        active_channel = self.cog.get_active_channel(game)
         if active_channel:
-            target_player = self.game.players[target_id]
-            embed = discord.Embed(
+            target_player = game.players[target_id]
+            kill_embed = discord.Embed(
                 title="☠️ Casualty Report",
-                description=f"<@{target_id}> ({target_player.character_name}) was devoured in the chaos.",
+                description=(
+                    f"<@{target_id}> (**{target_player.character_name}**) "
+                    "was devoured somewhere in the chaos."
+                ),
                 color=discord.Color.red(),
             )
-            await active_channel.send(embed=embed)
-
-            winner = self.game.check_win()
+            kill_embed.set_image(url=GIF_KILL)
+            await active_channel.send(embed=kill_embed)
+            winner = game.check_win()
             if winner:
-                await self.cog.end_game(active_channel, self.game, winner)
+                await self.cog.end_game(active_channel, game, winner)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Shifter DM control panel — sends a FRESH EliminateSelectView each press
+# ─────────────────────────────────────────────────────────────────────────────
 class ShifterControlView(discord.ui.View):
     def __init__(self, cog: "TitanGameCog", game_channel_id: int, user_id: int):
         super().__init__(timeout=None)
@@ -580,7 +577,9 @@ class ShifterControlView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("This shifter panel belongs to another player.", ephemeral=False)
+            await interaction.response.send_message(
+                "This panel belongs to another shifter.", ephemeral=True
+            )
             return False
         return True
 
@@ -588,39 +587,40 @@ class ShifterControlView(discord.ui.View):
     async def kill_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         game = self.cog.get_game_by_temp_channel(self.game_channel_id)
         if not game:
-            await interaction.response.send_message("This control panel is no longer active.", ephemeral=False)
+            await interaction.response.send_message("Game is no longer active.", ephemeral=False)
             return
-
-        player = game.players.get(self.user_id)
-        if not player or player.role != Role.TITAN_SHIFTER or not player.is_alive:
+        p = game.players.get(self.user_id)
+        if not p or p.role != Role.TITAN_SHIFTER or not p.is_alive:
             await interaction.response.send_message("You cannot use titan powers right now.", ephemeral=False)
             return
-
         cooldown = game.seconds_until_kill(self.user_id)
         if cooldown > 0:
             await interaction.response.send_message(
-                f"⏳ Your titan power is recharging. Wait **{cooldown}s** before the next strike.",
-                ephemeral=False,
+                f"⏳ Titan power recharging — **{cooldown}s** remaining.", ephemeral=False
             )
             return
+        # ← BUG FIX: create a brand-new EliminateSelectView with fresh target list
+        view = EliminateSelectView(self.cog, self.game_channel_id, self.user_id)
+        await interaction.response.send_message(
+            "🔴 Choose your target carefully…", view=view, ephemeral=False
+        )
 
-        view = EliminateSelectView(self.cog, game, self.user_id)
-        await interaction.response.send_message("Choose a scout to devour.", view=view, ephemeral=False)
-
-    @discord.ui.button(label="⏱️ Check Cooldown", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="⏱️ Cooldown Status", style=discord.ButtonStyle.secondary)
     async def cooldown_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         game = self.cog.get_game_by_temp_channel(self.game_channel_id)
         if not game:
-            await interaction.response.send_message("This control panel is no longer active.", ephemeral=False)
+            await interaction.response.send_message("Game is no longer active.", ephemeral=False)
             return
-
-        cooldown = game.seconds_until_kill(self.user_id)
-        if cooldown > 0:
-            await interaction.response.send_message(f"⏳ Next kill ready in **{cooldown}s**.", ephemeral=False)
+        cd = game.seconds_until_kill(self.user_id)
+        if cd > 0:
+            await interaction.response.send_message(f"⏳ Kill ready in **{cd}s**.", ephemeral=False)
         else:
-            await interaction.response.send_message("✅ Your next kill is **ready now**.", ephemeral=False)
+            await interaction.response.send_message("✅ Kill is **ready now**!", ephemeral=False)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Main game channel view
+# ─────────────────────────────────────────────────────────────────────────────
 class TitanGameTempView(discord.ui.View):
     def __init__(self, cog: "TitanGameCog", game_channel_id: int):
         super().__init__(timeout=None)
@@ -630,75 +630,103 @@ class TitanGameTempView(discord.ui.View):
     def get_game(self) -> Optional[TitanGameEngine]:
         return self.cog.get_game_by_temp_channel(self.game_channel_id)
 
-    @discord.ui.button(label="📋 Do Task", style=discord.ButtonStyle.success)
+    @discord.ui.button(label="🧩 Do Task", style=discord.ButtonStyle.success)
     async def task_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
-        game = self.get_game()
-        if not game:
-            await interaction.response.send_message("No game is active in this channel anymore.", ephemeral=True)
-            return
-
-        player = game.players.get(interaction.user.id)
-        if not player or not player.is_alive:
-            await interaction.response.send_message("Only living players can operate field tasks.", ephemeral=True)
-            return
-        if player.role == Role.TITAN_SHIFTER:
-            await interaction.response.send_message(
-                "🎭 Titan Shifters only *pretend* to work. Your real control panel is in your DMs.", ephemeral=True
-            )
-            return
-        if player.tasks_completed >= game.TASKS_PER_PLAYER:
-            await interaction.response.send_message(
-                "✅ You already completed every assigned mission task. Wait for the others!", ephemeral=True
-            )
-            return
-
-        task_index = game.get_next_task_index(interaction.user.id)
-        if task_index is not None and task_index < len(AOT_PUZZLE_TASKS):
-            task = AOT_PUZZLE_TASKS[task_index]
-            view = AoTPuzzleView(self.cog, self.game_channel_id, interaction.user.id, task)
-            await interaction.response.send_message(embed=view.build_task_embed(), view=view, ephemeral=True)
-        else:
-            # Fallback to legacy challenge
-            challenge = build_task_challenge()
-            view = TitanTaskChallengeView(self.cog, self.game_channel_id, interaction.user.id, challenge)
-            await interaction.response.send_message(embed=view.build_embed(), view=view, ephemeral=True)
+        await _send_task(self.cog, self.game_channel_id, interaction.user, interaction=interaction)
 
     @discord.ui.button(label="📡 Squad Status", style=discord.ButtonStyle.secondary)
     async def status_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         game = self.get_game()
         if not game:
-            await interaction.response.send_message("No game is active in this channel anymore.", ephemeral=True)
+            await interaction.response.send_message("No active game.", ephemeral=True)
             return
-
-        await interaction.response.send_message(embed=self.cog.build_status_embed(game, interaction.user.id), ephemeral=True)
+        await interaction.response.send_message(
+            embed=self.cog.build_status_embed(game, interaction.user.id), ephemeral=True
+        )
 
     @discord.ui.button(label="🚨 Emergency Meeting", style=discord.ButtonStyle.primary)
     async def meeting_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         game = self.get_game()
         if not game:
-            await interaction.response.send_message("No game is active in this channel anymore.", ephemeral=True)
+            await interaction.response.send_message("No active game.", ephemeral=True)
             return
-
-        if not game.call_meeting(interaction.user.id):
-            await interaction.response.send_message("You cannot call a meeting right now.", ephemeral=True)
+        success, err = game.call_meeting(interaction.user.id)
+        if not success:
+            await interaction.response.send_message(err or "You cannot call a meeting right now.", ephemeral=True)
             return
-
-        channel = interaction.channel
         embed = discord.Embed(
-            title="🚨 Emergency Meeting!",
+            title="🚨 EMERGENCY MEETING!",
             description=(
-                f"{interaction.user.mention} has fired the emergency flare!\n\n"
-                "All scouts must gather and discuss. You have **60 seconds** to vote."
+                f"{interaction.user.mention} fired the emergency flare!\n\n"
+                "All scouts must gather. You have **60 seconds** to discuss and vote."
             ),
             color=discord.Color.gold(),
         )
-        # Tag @everyone so all game participants see the alert
+        embed.set_image(url=GIF_MEETING)
         await interaction.response.send_message(
             content="@everyone",
             embed=embed,
             allowed_mentions=discord.AllowedMentions(everyone=True),
         )
-        await self.cog.begin_voting(channel, game)
+        await self.cog.begin_voting(interaction.channel, game)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared task dispatch helper (used by both button and /task command)
+# ─────────────────────────────────────────────────────────────────────────────
+async def _send_task(
+    cog: "TitanGameCog",
+    game_channel_id: int,
+    user: discord.User | discord.Member,
+    *,
+    interaction: Optional[discord.Interaction] = None,
+    ctx: Optional[commands.Context] = None,
+) -> None:
+    game = cog.get_game_by_temp_channel(game_channel_id)
+
+    async def _reply(content: str) -> None:
+        if interaction:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(content, ephemeral=True)
+            else:
+                await interaction.followup.send(content, ephemeral=True)
+        elif ctx:
+            await ctx.send(content, ephemeral=True)
+
+    async def _send_view(embed: discord.Embed, view: discord.ui.View) -> None:
+        if interaction:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            else:
+                await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+        elif ctx:
+            await ctx.send(embed=embed, view=view)
+
+    if not game:
+        await _reply("No active game in this channel.")
+        return
+    p = game.players.get(user.id)
+    if not p or not p.is_alive:
+        await _reply("Only living players can do tasks.")
+        return
+    if p.role == Role.TITAN_SHIFTER:
+        await _reply("🎭 Shifters only *pretend* to work. Your real panel is in your DMs.")
+        return
+    if p.tasks_completed >= game.TASKS_PER_PLAYER:
+        await _reply("✅ You already completed all your tasks! Wait for the others.")
+        return
+    if game.state != GameState.EXPLORATION:
+        await _reply("Tasks can only be done during the Exploration phase.")
+        return
+
+    idx = game.get_next_task_index(user.id)
+    if idx is None or idx >= len(JIGSAW_TASKS):
+        await _reply("You have no more tasks assigned right now.")
+        return
+
+    task = JIGSAW_TASKS[idx]
+    view = JigsawTaskView(cog, game_channel_id, user.id, task)
+    await _send_view(view.build_embed(), view)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -711,46 +739,47 @@ class TitanGameCog(commands.Cog):
         self.vote_tasks: dict[int, asyncio.Task] = {}
 
     def cog_unload(self):
-        for task in self.vote_tasks.values():
-            if not task.done():
-                task.cancel()
+        for t in self.vote_tasks.values():
+            if not t.done():
+                t.cancel()
 
+    # ── Lookup helpers ────────────────────────────────────────────────────
     def get_lobby_game(self, channel_id: int) -> Optional[TitanGameEngine]:
         return self.games.get(channel_id)
 
     def get_game_by_channel(self, channel_id: int) -> Optional[TitanGameEngine]:
-        for game in self.games.values():
-            if game.state == GameState.LOBBY and game.channel_id == channel_id:
-                return game
-            if game.game_channel_id == channel_id:
-                return game
+        for g in self.games.values():
+            if g.state == GameState.LOBBY and g.channel_id == channel_id:
+                return g
+            if g.game_channel_id == channel_id:
+                return g
         return None
 
     def get_game_by_player(self, user_id: int) -> Optional[TitanGameEngine]:
-        for game in self.games.values():
-            if user_id in game.players:
-                return game
+        for g in self.games.values():
+            if user_id in g.players:
+                return g
         return None
 
-    def get_game_by_temp_channel(self, game_channel_id: int) -> Optional[TitanGameEngine]:
-        for game in self.games.values():
-            if game.game_channel_id == game_channel_id:
-                return game
+    def get_game_by_temp_channel(self, ch_id: int) -> Optional[TitanGameEngine]:
+        for g in self.games.values():
+            if g.game_channel_id == ch_id:
+                return g
         return None
 
     def get_active_channel(self, game: TitanGameEngine) -> Optional[discord.TextChannel]:
-        channel_id = game.game_channel_id or game.channel_id
-        channel = self.bot.get_channel(channel_id)
-        return channel if isinstance(channel, discord.TextChannel) else None
+        ch = self.bot.get_channel(game.game_channel_id or game.channel_id)
+        return ch if isinstance(ch, discord.TextChannel) else None
 
+    # ── Embed builders ────────────────────────────────────────────────────
     def build_lobby_embed(self, game: TitanGameEngine) -> discord.Embed:
-        players = "\n".join(f"<@{user_id}>" for user_id in game.players.keys())
+        players = "\n".join(f"<@{uid}>" for uid in game.players)
         embed = discord.Embed(
             title="⚔️ Titan Shifters — Lobby",
             description=(
                 f"Host: <@{game.host_id}>\n"
-                f"Players: **{len(game.players)}/{game.MAX_PLAYERS}** (Minimum: {game.MIN_PLAYERS})\n"
-                "Use `/titan-game join`, `Aot titan-game join`, or the button below to enlist."
+                f"Players: **{len(game.players)}/{game.MAX_PLAYERS}** (min {game.MIN_PLAYERS})\n"
+                "Use `/titan-game join` or the button below to enlist."
             ),
             color=discord.Color.dark_theme(),
         )
@@ -760,81 +789,88 @@ class TitanGameCog(commands.Cog):
 
     def build_status_embed(self, game: TitanGameEngine, viewer_id: Optional[int] = None) -> discord.Embed:
         alive = len(game.alive_players())
-        alive_shifters = len(game.alive_shifters())
-        alive_scouts = len(game.alive_survey_corps())
-        completed, required = game.get_task_progress()
-
-        embed = discord.Embed(title="📊 Field Status", color=discord.Color.gold())
+        embed = discord.Embed(
+            title=f"📊 Field Status — Round {game.round_number}",
+            color=discord.Color.gold(),
+        )
         embed.description = (
             f"Phase: **{game.state.name.title()}**\n"
+            f"Round: **{game.round_number}**\n"
             f"Alive: **{alive}/{len(game.players)}**\n"
-            f"Survey Corps Alive: **{alive_scouts}**\n"
-            f"Shifters Alive: **{alive_shifters}**"
+            f"Survey Corps: **{len(game.alive_survey_corps())}** alive\n"
+            f"Shifters: **{len(game.alive_shifters())}** alive"
         )
+        done, req = game.get_task_progress()
         embed.add_field(
             name="🎯 Mission Progress",
-            value=f"Squad tasks completed: **{completed}/{required or game.total_tasks_required}**",
+            value=f"Squad tasks: **{done}/{req or game.total_tasks_required}**",
             inline=False,
         )
-
+        mc = game.seconds_until_meeting()
+        embed.add_field(
+            name="🚨 Meeting Cooldown",
+            value="✅ Meeting ready!" if mc == 0 else f"⏳ **{mc}s** until next meeting allowed",
+            inline=False,
+        )
         if viewer_id and viewer_id in game.players:
-            player = game.players[viewer_id]
-            if player.role == Role.SURVEY_CORPS:
-                remaining = game.TASKS_PER_PLAYER - player.tasks_completed
+            p = game.players[viewer_id]
+            if p.role == Role.SURVEY_CORPS:
                 embed.add_field(
                     name="📋 Your Assignment",
                     value=(
-                        f"Tasks completed: **{player.tasks_completed}/{game.TASKS_PER_PLAYER}**\n"
-                        f"Remaining: **{remaining}** task(s)"
+                        f"Tasks done: **{p.tasks_completed}/{game.TASKS_PER_PLAYER}**\n"
+                        f"Remaining: **{game.TASKS_PER_PLAYER - p.tasks_completed}**"
                     ),
                     inline=False,
                 )
             else:
-                cooldown = game.seconds_until_kill(viewer_id)
+                cd = game.seconds_until_kill(viewer_id)
                 embed.add_field(
-                    name="🔴 Your Titan Window",
-                    value="✅ Kill ready now!" if cooldown == 0 else f"⏳ Kill cooldown: **{cooldown}s**",
+                    name="🔴 Titan Kill Window",
+                    value="✅ Ready!" if cd == 0 else f"⏳ Cooldown: **{cd}s**",
                     inline=False,
                 )
-
         if game.state == GameState.VOTING:
             embed.add_field(
                 name="🗳️ Voting Clock",
-                value=f"**{game.get_vote_time_remaining()}s** remaining to vote.",
+                value=f"**{game.get_vote_time_remaining()}s** left",
                 inline=False,
             )
-
         return embed
 
+    # ── Lobby message refresh ─────────────────────────────────────────────
     async def refresh_lobby_message(self, game: TitanGameEngine):
         if not game.lobby_message_id:
             return
-
-        channel = self.bot.get_channel(game.channel_id)
-        if not isinstance(channel, discord.TextChannel):
+        ch = self.bot.get_channel(game.channel_id)
+        if not isinstance(ch, discord.TextChannel):
             return
-
         try:
-            message = await channel.fetch_message(game.lobby_message_id)
+            msg = await ch.fetch_message(game.lobby_message_id)
+            await msg.edit(embed=self.build_lobby_embed(game), view=TitanLobbyView(self, game.channel_id))
         except discord.HTTPException:
-            return
+            pass
 
-        await message.edit(embed=self.build_lobby_embed(game), view=TitanLobbyView(self, game.channel_id))
-
+    # ── Vote task helpers ─────────────────────────────────────────────────
     def cancel_vote_task(self, game: TitanGameEngine):
-        task = self.vote_tasks.pop(game.channel_id, None)
-        current = asyncio.current_task()
-        if task and not task.done() and task is not current:
-            task.cancel()
+        t = self.vote_tasks.pop(game.channel_id, None)
+        cur = asyncio.current_task()
+        if t and not t.done() and t is not cur:
+            t.cancel()
 
     async def begin_voting(self, channel: discord.abc.Messageable, game: TitanGameEngine):
         if not game.start_voting():
             return
-
-        await channel.send(
-            "🗳️ Voting has started! Use `Aot vote @user` or `/vote @user` within **60 seconds**. "
-            "Use the command without a target to skip."
+        embed = discord.Embed(
+            title="🗳️ Voting Begins!",
+            description=(
+                "Use `Aot vote @user` or `/vote @user` to cast your vote within **60 seconds**.\n"
+                "Skip with the command and no target."
+            ),
+            color=discord.Color.blurple(),
         )
+        embed.set_image(url=GIF_VOTE_START)
+        await channel.send(embed=embed)
         self.cancel_vote_task(game)
         self.vote_tasks[game.channel_id] = self.bot.loop.create_task(
             self.vote_timeout_task(channel.id, game.channel_id)
@@ -846,11 +882,10 @@ class TitanGameCog(commands.Cog):
             game = self.games.get(game_key)
             if not game or game.state != GameState.VOTING:
                 return
-
-            channel = self.bot.get_channel(channel_id)
-            if isinstance(channel, discord.TextChannel):
-                await channel.send("⏰ The voting flare burns out. The meeting is ending now.")
-                await self.resolve_votes(channel, game)
+            ch = self.bot.get_channel(channel_id)
+            if isinstance(ch, discord.TextChannel):
+                await ch.send("⏰ Voting time is up! Tallying results now…")
+                await self.resolve_votes(ch, game)
         except asyncio.CancelledError:
             return
 
@@ -858,63 +893,59 @@ class TitanGameCog(commands.Cog):
         await asyncio.sleep(240)
         if game.state == GameState.LOBBY and self.games.get(channel_id) == game:
             del self.games[channel_id]
-            channel = self.bot.get_channel(channel_id)
-            if isinstance(channel, discord.TextChannel):
-                await channel.send("Lobby automatically cancelled after 4 minutes of inactivity.")
+            ch = self.bot.get_channel(channel_id)
+            if isinstance(ch, discord.TextChannel):
+                await ch.send("⏰ Lobby cancelled after 4 minutes of inactivity.")
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # Commands
-    # ─────────────────────────────────────────────────────────────────────────
-    @commands.hybrid_group(name="titan-game", description="Titan Shifters social deduction game", invoke_without_command=True)
+    # ── Commands ──────────────────────────────────────────────────────────
+    @commands.hybrid_group(
+        name="titan-game",
+        description="Titan Shifters social deduction game",
+        invoke_without_command=True,
+    )
     async def titan_game(self, ctx: commands.Context):
         await ctx.send_help(ctx.command)
 
     @titan_game.command(name="create", description="Create a new Titan Shifters lobby")
     async def tg_create(self, ctx: commands.Context):
         if self.get_lobby_game(ctx.channel.id) or self.get_game_by_channel(ctx.channel.id):
-            await ctx.send("A Titan Shifters game is already tied to this channel.", ephemeral=True)
+            await ctx.send("A game is already tied to this channel.", ephemeral=True)
             return
-
         game = TitanGameEngine(ctx.guild.id, ctx.channel.id, ctx.author.id)
         self.games[ctx.channel.id] = game
-
         view = TitanLobbyView(self, ctx.channel.id)
-        message = await ctx.send(embed=self.build_lobby_embed(game), view=view)
-        game.lobby_message_id = message.id
+        msg = await ctx.send(embed=self.build_lobby_embed(game), view=view)
+        game.lobby_message_id = msg.id
         self.bot.loop.create_task(self.lobby_timeout_task(ctx.channel.id, game))
 
-    @titan_game.command(name="join", description="Join the current Titan Shifters lobby")
+    @titan_game.command(name="join", description="Join the lobby")
     async def tg_join(self, ctx: commands.Context):
         game = self.get_lobby_game(ctx.channel.id)
         if not game:
-            await ctx.send("No lobby found in this channel.", ephemeral=True)
+            await ctx.send("No lobby found.", ephemeral=True)
             return
-
         success, msg = game.add_player(ctx.author.id)
         if success:
             await self.refresh_lobby_message(game)
-            await ctx.send(f"{ctx.author.mention} joined the squad. ({len(game.players)}/{game.MAX_PLAYERS} players)")
+            await ctx.send(f"{ctx.author.mention} joined. ({len(game.players)}/{game.MAX_PLAYERS})")
         else:
             await ctx.send(msg, ephemeral=True)
 
-    @titan_game.command(name="leave", description="Leave the current Titan Shifters lobby")
+    @titan_game.command(name="leave", description="Leave the lobby")
     async def tg_leave(self, ctx: commands.Context):
         game = self.get_lobby_game(ctx.channel.id)
         if not game or game.state != GameState.LOBBY:
             await ctx.send("You can only leave during the lobby phase.", ephemeral=True)
             return
-
         if not game.remove_player(ctx.author.id):
             await ctx.send("You are not in the lobby.", ephemeral=True)
             return
-
         if not game.players:
             del self.games[ctx.channel.id]
-            await ctx.send("Everyone left. The lobby has been closed.")
+            await ctx.send("Everyone left. Lobby closed.")
             return
-
         await self.refresh_lobby_message(game)
-        await ctx.send(f"{ctx.author.mention} left the squad. Host is now <@{game.host_id}>.")
+        await ctx.send(f"{ctx.author.mention} left. Host: <@{game.host_id}>.")
 
     @titan_game.command(name="start", description="Start the game (host only)")
     async def tg_start(self, ctx: commands.Context):
@@ -923,9 +954,8 @@ class TitanGameCog(commands.Cog):
             await ctx.send("No lobby found.", ephemeral=True)
             return
         if ctx.author.id != game.host_id:
-            await ctx.send("Only the host can start the game.", ephemeral=True)
+            await ctx.send("Only the host can start.", ephemeral=True)
             return
-
         success, msg = game.start_game()
         if not success:
             await ctx.send(msg, ephemeral=True)
@@ -933,7 +963,7 @@ class TitanGameCog(commands.Cog):
 
         guild = ctx.guild
         category = guild.get_channel(GAME_CATEGORY_ID)
-        if category is None:
+        if not isinstance(category, discord.CategoryChannel):
             try:
                 category = await guild.fetch_channel(GAME_CATEGORY_ID)
             except discord.HTTPException:
@@ -945,193 +975,175 @@ class TitanGameCog(commands.Cog):
             guild.default_role: discord.PermissionOverwrite(view_channel=False),
             guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
         }
-        for user_id in game.players.keys():
-            member = guild.get_member(user_id)
-            if member:
-                overwrites[member] = discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True,
+        for uid in game.players:
+            m = guild.get_member(uid)
+            if m:
+                overwrites[m] = discord.PermissionOverwrite(
+                    view_channel=True, send_messages=True, read_message_history=True
                 )
 
         game_channel = await guild.create_text_channel(
-            name=f"shifters-game-{random.randint(1000, 9999)}",
+            name=f"shifters-r{game.round_number}-{random.randint(1000,9999)}",
             category=category,
             overwrites=overwrites,
         )
         game.game_channel_id = game_channel.id
 
+        # Update lobby message
         if game.lobby_message_id:
-            channel = self.bot.get_channel(game.channel_id)
-            if isinstance(channel, discord.TextChannel):
+            lch = self.bot.get_channel(game.channel_id)
+            if isinstance(lch, discord.TextChannel):
                 try:
-                    message = await channel.fetch_message(game.lobby_message_id)
-                    launch_embed = discord.Embed(
-                        title="🚀 Squad Deployed!",
-                        description=(
-                            f"The expedition has moved to {game_channel.mention}.\n"
-                            "All players have received their roles via DM."
+                    lmsg = await lch.fetch_message(game.lobby_message_id)
+                    await lmsg.edit(
+                        embed=discord.Embed(
+                            title="🚀 Squad Deployed!",
+                            description=f"Game moved to {game_channel.mention}. Roles sent via DM.",
+                            color=discord.Color.dark_blue(),
                         ),
-                        color=discord.Color.dark_blue(),
+                        view=None,
                     )
-                    await message.edit(embed=launch_embed, view=None)
                 except discord.HTTPException:
                     pass
 
-        # ── NEW: Mention every player in the original channel telling them where to go ──
-        player_mentions = " ".join(f"<@{uid}>" for uid in game.players.keys())
+        # Ping every player
+        mentions = " ".join(f"<@{uid}>" for uid in game.players)
         await ctx.send(
-            content=(
-                f"⚔️ **Titan Shifters has begun!** {player_mentions}\n"
-                f"Head to {game_channel.mention} — your roles are being sent via DM now!"
-            ),
+            content=f"⚔️ **Titan Shifters — Round {game.round_number} begins!** {mentions}\nHead to {game_channel.mention} — roles incoming via DM!",
             allowed_mentions=discord.AllowedMentions(users=True),
         )
 
-        for user_id, player in game.players.items():
-            user = self.bot.get_user(user_id) or await self.bot.fetch_user(user_id)
+        # Send DMs
+        for uid, p in game.players.items():
+            user = self.bot.get_user(uid) or await self.bot.fetch_user(uid)
             embed = discord.Embed(
-                title="🔴 Secret Transmission" if player.role == Role.TITAN_SHIFTER else "🟢 Operation Briefing"
+                title="🔴 Secret Transmission" if p.role == Role.TITAN_SHIFTER else "🟢 Operation Briefing"
             )
-            file = None
-
-            if player.role == Role.TITAN_SHIFTER:
+            file_obj = None
+            if p.role == Role.TITAN_SHIFTER:
                 embed.color = discord.Color.red()
                 embed.description = (
-                    f"You are the **{player.character_name}**.\n\n"
-                    "**Role:** 🔴 Titan Shifter\n\n"
-                    "Blend in, survive the vote, and **devour** the Survey Corps.\n"
-                    "Your private kill panel is attached below."
+                    f"You are the **{p.character_name}**.\n\n"
+                    "**Role:** 🔴 Titan Shifter\n"
+                    "Blend in, survive the vote, and devour the Survey Corps.\n"
+                    "Your private kill panel is below."
                 )
                 embed.add_field(
                     name="⚠️ Shifter Tips",
                     value=(
-                        "• Press buttons in the game channel to appear busy.\n"
-                        "• Your kill panel is only visible to you.\n"
-                        "• Kill cooldown: **45 seconds** — plan your moves."
+                        "• Use the kill menu for each kill — it refreshes after every one.\n"
+                        "• Kill cooldown: **45s** — plan ahead.\n"
+                        "• Meeting cooldown is **30s** after any meeting ends."
                     ),
                     inline=False,
                 )
             else:
                 embed.color = discord.Color.green()
                 embed.description = (
-                    f"You are **{player.character_name}**.\n\n"
-                    "**Role:** 🟢 Survey Corps Member\n\n"
-                    "Complete your field assignments, catch the shifter, and **survive** the expedition."
+                    f"You are **{p.character_name}**.\n\n"
+                    "**Role:** 🟢 Survey Corps Member\n"
+                    "Complete your jigsaw tasks, catch the shifter, and survive."
                 )
                 embed.add_field(
                     name="📋 Crewmate Tips",
                     value=(
-                        "• Use **📋 Do Task** to receive AoT puzzle missions.\n"
-                        "• Each task tests your AoT knowledge — answer correctly to progress.\n"
-                        "• Call an **🚨 Emergency Meeting** if you spot a shifter.\n"
-                        f"• You have **{game.TASKS_PER_PLAYER}** tasks to complete."
+                        "• Use **🧩 Do Task** or `Aot task` to get a jigsaw puzzle.\n"
+                        "• Assemble pieces in the right order — no boring quizzes!\n"
+                        f"• You have **{game.TASKS_PER_PLAYER}** tasks to complete.\n"
+                        "• Call 🚨 Emergency Meeting if you spot a shifter."
                     ),
                     inline=False,
                 )
             embed.add_field(
                 name="🏟️ Game Channel",
-                value=f"Head to {game_channel.mention} to play!",
+                value=f"Head to {game_channel.mention}!",
                 inline=False,
             )
-
-            if player.image_url:
-                file = attach_image(embed, player.image_url, as_thumbnail=True)
-            elif player.role == Role.SURVEY_CORPS and SURVEY_CORPS_IMAGES:
-                file = attach_image(embed, random.choice(SURVEY_CORPS_IMAGES), as_thumbnail=True)
-
+            if p.image_url:
+                file_obj = attach_image(embed, p.image_url, as_thumbnail=True)
+            elif p.role == Role.SURVEY_CORPS and SURVEY_CORPS_IMAGES:
+                file_obj = attach_image(embed, random.choice(SURVEY_CORPS_IMAGES), as_thumbnail=True)
             try:
-                if file:
-                    await user.send(embed=embed, file=file)
+                if file_obj:
+                    await user.send(embed=embed, file=file_obj)
                 else:
                     await user.send(embed=embed)
-
-                if player.role == Role.TITAN_SHIFTER:
+                if p.role == Role.TITAN_SHIFTER:
                     await user.send(
-                        "🔴 **Private Titan Control Panel** — only you can see and use these.",
-                        view=ShifterControlView(self, game_channel.id, user_id),
+                        "🔴 **Private Titan Control Panel** — only you can use this.",
+                        view=ShifterControlView(self, game_channel.id, uid),
                     )
             except discord.Forbidden:
                 await ctx.channel.send(
-                    f"⚠️ {user.mention} has DMs disabled. They will miss their private role info and shifter controls."
+                    f"⚠️ <@{uid}> has DMs disabled — they will miss role info."
                 )
 
+        # Game channel intro
         missions = [
             "Seal the breach before titans flood the district",
             "Escort refugees through collapsing rooftops",
             "Scout a forest approach and mark titan nests",
             "Recover supply carts stranded beyond the inner gate",
             "Hunt for a hidden shifter moving inside the smoke",
-            "Defend Trost District and drive back the Pure Titans",
-            "Investigate the Wall Titan sightings near Wall Rose",
+            "Defend Trost District from the Pure Titan advance",
+            "Investigate Wall Titan sightings near Wall Rose",
         ]
-        chosen_mission = random.choice(missions)
-
         embed = discord.Embed(
-            title="⚔️ Expedition Phase — Exploration Begins!",
+            title=f"⚔️ Round {game.round_number} — Expedition Begins!",
             description=(
                 "Steel cables scream through the air as the squad enters hostile territory.\n\n"
-                f"**📜 Current Mission:** {chosen_mission}\n"
-                f"**🎯 Task Goal:** {game.TASKS_PER_PLAYER} tasks per living Survey Corps member\n"
-                f"**⏱️ Shifter Kill Cooldown:** {game.KILL_COOLDOWN_SECONDS} seconds\n"
-                f"**👥 Players:** {len(game.players)} soldiers deployed"
+                f"**📜 Mission:** {random.choice(missions)}\n"
+                f"**🧩 Tasks:** {game.TASKS_PER_PLAYER} jigsaw tasks per crewmate\n"
+                f"**⏱️ Kill Cooldown:** {game.KILL_COOLDOWN_SECONDS}s\n"
+                f"**🚨 Meeting Cooldown:** {game.MEETING_COOLDOWN_SECONDS}s after each meeting\n"
+                f"**👥 Players:** {len(game.players)} deployed"
             ),
             color=discord.Color.dark_blue(),
         )
         embed.add_field(
-            name="📣 Command Notes",
+            name="📣 How to Play",
             value=(
-                "📋 **Survey Corps** → Use **Do Task** button for AoT quiz missions.\n"
+                "🧩 **Crewmates** → Click **Do Task** or use `Aot task` for jigsaw puzzles.\n"
                 "🚨 **Emergency Meeting** → Call a vote if you suspect a shifter.\n"
-                "🔴 **Titan Shifters** → Your kill panel is in your **DMs**.\n"
-                "🗳️ Voting ends automatically after **60 seconds**."
+                "🔴 **Shifters** → Kill panel is in your **DMs** (works every kill!).\n"
+                "🗳️ Vote ends after **60s** automatically."
             ),
             inline=False,
         )
         embed.add_field(
-            name="🪖 Players in this Game",
-            value=" ".join(f"<@{uid}>" for uid in game.players.keys()),
+            name="🪖 Players",
+            value=" ".join(f"<@{uid}>" for uid in game.players),
             inline=False,
         )
+        embed.set_image(url=GIF_GAME_START)
         embed.set_footer(text="May the Walls protect you — or may the titans feast tonight.")
 
         view = TitanGameTempView(self, game_channel.id)
-        if "Transformation" in TITAN_IMAGES:
-            file = attach_image(embed, random.choice(TITAN_IMAGES["Transformation"]))
-            if file:
-                await game_channel.send(embed=embed, file=file, view=view)
-            else:
-                await game_channel.send(embed=embed, view=view)
-        else:
-            await game_channel.send(embed=embed, view=view)
+        await game_channel.send(embed=embed, view=view)
 
-    @titan_game.command(name="status", description="Check the status of the current game")
+    @titan_game.command(name="status", description="Check game status")
     async def tg_status(self, ctx: commands.Context):
         game = self.get_game_by_channel(ctx.channel.id)
         if not game:
-            await ctx.send("No active game in this channel.", ephemeral=True)
+            await ctx.send("No active game here.", ephemeral=True)
             return
-
         await ctx.send(embed=self.build_status_embed(game, ctx.author.id))
 
-    @titan_game.command(name="stop", description="Forcefully end the game (host/admin only)")
+    @titan_game.command(name="stop", description="Force-end the game (host/admin)")
     async def tg_stop(self, ctx: commands.Context):
         game = self.get_game_by_channel(ctx.channel.id) or self.get_game_by_player(ctx.author.id)
         if not game:
-            await ctx.send("No active game found for you here.", ephemeral=True)
+            await ctx.send("No active game found.", ephemeral=True)
             return
-
         if ctx.author.id != game.host_id and not ctx.author.guild_permissions.administrator:
-            await ctx.send("Only the host or a server admin can stop the game.", ephemeral=True)
+            await ctx.send("Only the host or an admin can stop the game.", ephemeral=True)
             return
-
         self.cancel_vote_task(game)
         self.games.pop(game.channel_id, None)
-        await ctx.send("🛑 Titan Shifters has been forcefully stopped.")
-
-        active_channel = self.get_active_channel(game)
-        if active_channel and active_channel.id != ctx.channel.id:
-            await active_channel.send("🛑 The expedition has been aborted by command.")
+        await ctx.send("🛑 Game forcefully stopped.")
+        ch = self.get_active_channel(game)
+        if ch and ch.id != ctx.channel.id:
+            await ch.send("🛑 The expedition was aborted by command.")
         if game.game_channel_id:
             self.bot.loop.create_task(self.cleanup_temp_channel(game))
 
@@ -1139,57 +1151,52 @@ class TitanGameCog(commands.Cog):
     async def eliminate(self, ctx: commands.Context, target: discord.User):
         game = self.get_game_by_player(ctx.author.id)
         if not game:
-            await ctx.send("You are not in any Titan Shifters game.", ephemeral=True)
+            await ctx.send("You are not in any game.", ephemeral=True)
             return
-
         if not isinstance(ctx.channel, discord.DMChannel) and not ctx.interaction:
             try:
                 await ctx.message.delete()
             except discord.HTTPException:
                 pass
-            await ctx.author.send("⚠️ You used `Aot eliminate` in public. Be careful not to expose yourself.")
-
+            await ctx.author.send("⚠️ You used `Aot eliminate` in public. Be more careful!")
         success, msg = game.eliminate(ctx.author.id, target.id)
         if not success:
             await ctx.send(msg, ephemeral=True)
             return
-
         await ctx.send(msg, ephemeral=True)
-
-        active_channel = self.get_active_channel(game)
-        if active_channel:
-            target_player = game.players[target.id]
+        ch = self.get_active_channel(game)
+        if ch:
+            tp = game.players[target.id]
             embed = discord.Embed(
                 title="☠️ Casualty Report",
-                description=f"{target.mention} ({target_player.character_name}) has been found devoured by a Titan.",
+                description=f"{target.mention} (**{tp.character_name}**) was devoured by a Titan.",
                 color=discord.Color.red(),
             )
-            await active_channel.send(embed=embed)
-
+            embed.set_image(url=GIF_KILL)
+            await ch.send(embed=embed)
             winner = game.check_win()
             if winner:
-                await self.end_game(active_channel, game, winner)
+                await self.end_game(ch, game, winner)
 
     @commands.hybrid_command(name="meeting", description="Call an emergency meeting")
     async def meeting(self, ctx: commands.Context):
         game = self.get_game_by_channel(ctx.channel.id)
         if not game:
-            await ctx.send("No active game in this channel.", ephemeral=True)
+            await ctx.send("No active game here.", ephemeral=True)
             return
-
-        if not game.call_meeting(ctx.author.id):
-            await ctx.send("You cannot call a meeting right now.", ephemeral=True)
+        success, err = game.call_meeting(ctx.author.id)
+        if not success:
+            await ctx.send(err or "You cannot call a meeting now.", ephemeral=True)
             return
-
         embed = discord.Embed(
-            title="🚨 Emergency Meeting!",
+            title="🚨 EMERGENCY MEETING!",
             description=(
-                f"{ctx.author.mention} has fired the emergency flare!\n\n"
-                "All scouts gather — you have **60 seconds** to discuss and vote."
+                f"{ctx.author.mention} fired the emergency flare!\n\n"
+                "Gather! You have **60 seconds** to discuss and vote."
             ),
             color=discord.Color.gold(),
         )
-        # ── NEW: Tag @everyone when a meeting is called ──
+        embed.set_image(url=GIF_MEETING)
         await ctx.send(
             content="@everyone",
             embed=embed,
@@ -1197,44 +1204,51 @@ class TitanGameCog(commands.Cog):
         )
         await self.begin_voting(ctx.channel, game)
 
-    @commands.hybrid_command(name="vote", description="Vote to exile a player")
-    async def vote(self, ctx: commands.Context, target: discord.Member = None):
+    @commands.hybrid_command(name="task", description="Start your next jigsaw task (Survey Corps only)")
+    async def task_cmd(self, ctx: commands.Context):
+        """Allows players to start a task without the button — `Aot task` or `/task`."""
         game = self.get_game_by_channel(ctx.channel.id)
         if not game:
             await ctx.send("No active game in this channel.", ephemeral=True)
             return
+        await _send_task(self, game.game_channel_id or ctx.channel.id, ctx.author, ctx=ctx)
 
+    @commands.hybrid_command(name="vote", description="Vote to exile a player")
+    async def vote(self, ctx: commands.Context, target: discord.Member = None):
+        game = self.get_game_by_channel(ctx.channel.id)
+        if not game:
+            await ctx.send("No active game here.", ephemeral=True)
+            return
         target_id = target.id if target else None
         success, msg = game.vote(ctx.author.id, target_id)
         if not success:
             await ctx.send(msg, ephemeral=True)
             return
-
         if target_id is None:
             await ctx.send(f"{ctx.author.mention} skipped their vote.")
         else:
             await ctx.send(f"🗳️ {ctx.author.mention} locked in a vote.")
-
-        if all(player.has_voted for player in game.alive_players()):
+        if all(p.has_voted for p in game.alive_players()):
             await self.resolve_votes(ctx.channel, game)
 
+    # ── Vote resolution ───────────────────────────────────────────────────
     async def resolve_votes(self, channel: discord.TextChannel, game: TitanGameEngine):
         self.cancel_vote_task(game)
         exiled_id, is_tie = game.get_vote_results()
 
         embed = discord.Embed(title="⚖️ The Verdict", color=discord.Color.dark_theme())
         if is_tie or exiled_id is None:
-            embed.description = "🤝 The squad could not reach a consensus. **No one was exiled.**"
+            embed.description = "🤝 Tie — **no one was exiled.**"
         else:
-            exiled_player = game.players[exiled_id]
-            embed.description = f"<@{exiled_id}> ({exiled_player.character_name}) was exiled by the squad."
-            if exiled_player.role == Role.TITAN_SHIFTER:
+            ep = game.players[exiled_id]
+            embed.description = f"<@{exiled_id}> (**{ep.character_name}**) was exiled."
+            if ep.role == Role.TITAN_SHIFTER:
                 embed.color = discord.Color.green()
-                embed.description += "\n\n✅ **They were a Titan Shifter!** The corps celebrates!"
+                embed.description += "\n\n✅ **They WERE a Titan Shifter!** Corps celebrates!"
             else:
                 embed.color = discord.Color.red()
-                embed.description += "\n\n❌ **They were NOT a Titan Shifter.** An innocent soldier falls."
-
+                embed.description += "\n\n❌ **They were NOT a Titan Shifter.** An innocent falls."
+        embed.set_image(url=GIF_EXILE)
         await channel.send(embed=embed)
 
         winner = game.check_win()
@@ -1242,58 +1256,57 @@ class TitanGameCog(commands.Cog):
             await self.end_game(channel, game, winner)
             return
 
+        # Advance round + set meeting cooldown
+        game.advance_round()
+        game.end_meeting_set_cooldown()
         game.state = GameState.EXPLORATION
         await channel.send(
-            "The meeting breaks. 💨 Smoke closes in again and the expedition resumes. "
-            "Survey Corps — back to your tasks. Shifters — stay hidden."
+            f"💨 Meeting ends. Round **{game.round_number}** begins!\n"
+            f"🚨 Next meeting available in **{game.MEETING_COOLDOWN_SECONDS}s**.\n"
+            "Survey Corps — back to tasks. Shifters — stay hidden."
         )
 
+    # ── End game ──────────────────────────────────────────────────────────
     async def end_game(self, channel: discord.TextChannel, game: TitanGameEngine, winner: Role):
         self.cancel_vote_task(game)
         game.state = GameState.GAME_OVER
 
         embed = discord.Embed(title="🏁 Game Over", color=discord.Color.gold())
-        file = None
         if winner == Role.SURVEY_CORPS:
             embed.description = (
-                "🎉 **The Survey Corps wins!**\n\n"
-                "The mission is complete. Every Titan Shifter has been rooted out. "
-                "**Humanity holds the line!**"
+                "🎉 **Survey Corps wins!**\n\n"
+                "Every Titan Shifter was rooted out. Humanity holds the line!"
             )
-            if "Founding Titan" in TITAN_IMAGES:
-                file = attach_image(embed, random.choice(TITAN_IMAGES["Founding Titan"]))
+            embed.set_image(url=GIF_SC_WIN)
         else:
             embed.description = (
-                "💀 **The Titans win!**\n\n"
-                "The Titan Shifters overwhelmed the expedition. "
-                "**The district falls into ruin.**"
+                "💀 **Titans win!**\n\n"
+                "The Titan Shifters overwhelmed the expedition. The district falls."
             )
-            if "Pure Titan" in TITAN_IMAGES:
-                file = attach_image(embed, random.choice(TITAN_IMAGES["Pure Titan"]))
+            embed.set_image(url=GIF_TITAN_WIN)
 
-        shifter_mentions = [
-            f"<@{player.user_id}> — **{player.character_name}**"
-            for player in game.players.values()
-            if player.role == Role.TITAN_SHIFTER
-        ]
-        embed.add_field(name="🔴 Titan Shifters Were", value="\n".join(shifter_mentions) or "None", inline=False)
+        embed.add_field(
+            name="🔴 Titan Shifters",
+            value="\n".join(
+                f"<@{p.user_id}> — **{p.character_name}**"
+                for p in game.players.values() if p.role == Role.TITAN_SHIFTER
+            ) or "None",
+            inline=False,
+        )
+        embed.add_field(
+            name="🟢 Survey Corps Results",
+            value="\n".join(
+                f"<@{p.user_id}> — {p.character_name} — {p.tasks_completed}/{game.TASKS_PER_PLAYER} tasks"
+                for p in game.players.values() if p.role == Role.SURVEY_CORPS
+            ) or "None",
+            inline=False,
+        )
+        embed.set_footer(text=f"Game lasted {game.round_number} round(s).")
+        await channel.send(embed=embed)
 
-        sc_summary = [
-            f"<@{player.user_id}> — {player.character_name} — {player.tasks_completed}/{game.TASKS_PER_PLAYER} tasks"
-            for player in game.players.values()
-            if player.role == Role.SURVEY_CORPS
-        ]
-        if sc_summary:
-            embed.add_field(name="🟢 Survey Corps", value="\n".join(sc_summary), inline=False)
-
-        if file:
-            await channel.send(embed=embed, file=file)
-        else:
-            await channel.send(embed=embed)
-
-        lobby_channel = self.bot.get_channel(game.channel_id)
-        if isinstance(lobby_channel, discord.TextChannel) and lobby_channel.id != channel.id:
-            await lobby_channel.send(f"🏁 Titan Shifters ended in {channel.mention}. GG everyone!")
+        lch = self.bot.get_channel(game.channel_id)
+        if isinstance(lch, discord.TextChannel) and lch.id != channel.id:
+            await lch.send(f"🏁 Titan Shifters ended in {channel.mention} after {game.round_number} round(s). GG!")
 
         self.games.pop(game.channel_id, None)
         if game.game_channel_id:
@@ -1302,16 +1315,14 @@ class TitanGameCog(commands.Cog):
     async def cleanup_temp_channel(self, game: TitanGameEngine):
         if not game.game_channel_id:
             return
-
-        temp_channel = self.bot.get_channel(game.game_channel_id)
-        if not isinstance(temp_channel, discord.TextChannel):
+        ch = self.bot.get_channel(game.game_channel_id)
+        if not isinstance(ch, discord.TextChannel):
             return
-
         try:
             await asyncio.sleep(15)
-            await temp_channel.delete()
+            await ch.delete()
         except discord.HTTPException:
-            return
+            pass
 
 
 async def setup(bot):
