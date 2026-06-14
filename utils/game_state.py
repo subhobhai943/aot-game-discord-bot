@@ -1,22 +1,25 @@
-"""In-memory game state manager with JSON persistence.
+"""In-memory game state manager with SQLite-backed persistence.
 
-FIX: TITAN_IMAGES now uses stable external image URLs (wiki/fandom CDN)
-     instead of local assets in the repo. This keeps the bot lightweight
-     and unlocks unlimited image variety — just swap the URL.
+Player data (levels, XP, coins, titans) and guild settings are stored
+in data/odmstriker.db via utils/db.py.  Active battle / PvP sessions
+remain in-memory (they are transient and reset on restart by design).
 """
 from __future__ import annotations
-import json
 import os
 import random
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from typing import Optional
 import discord
 from data.titan_images import TITAN_IMAGES as _ALL_TITAN_IMAGES
 
-DATA_FILE        = "data/player_data.json"
-SETTINGS_FILE    = "data/settings.json"
+# ── DB import (optional graceful fallback for legacy JSON) ─────────────
+try:
+    from utils.db import Database
+    _DB_AVAILABLE = True
+except ImportError:
+    _DB_AVAILABLE = False
 
-RANKS      = ["Cadet", "Scout", "Elite", "Captain", "Legend"]
+RANKS        = ["Cadet", "Scout", "Elite", "Captain", "Legend"]
 XP_PER_LEVEL = 120
 
 CHARACTERS = [
@@ -32,7 +35,6 @@ TITANS = [
     "Pure Titan",      "Abnormal Titan",
 ]
 
-# ── Titan stats for battles ────────────────────────────────────────────────
 TITAN_STATS = {
     "Founding Titan":   {"hp": 500, "atk": 90, "def": 80, "spd": 60, "rarity": "Legendary"},
     "Colossal Titan":   {"hp": 450, "atk": 85, "def": 75, "spd": 40, "rarity": "Legendary"},
@@ -63,11 +65,12 @@ RARITY_COLOR = {
 }
 
 RARITY_EMOJI = {
-    "Common": "⬜", "Uncommon": "🟢", "Rare": "🔵", "Epic": "🟣", "Legendary": "🟡"
+    "Common": "\u2b1c", "Uncommon": "\U0001f7e2", "Rare": "\U0001f535",
+    "Epic": "\U0001f7e3", "Legendary": "\U0001f7e1"
 }
 
-# ── Titan Images ──────────────────────────────────────────────────────────
 SURVEY_CORPS_ICON = "assets/Titans/survey_corps.png"
+
 
 def get_titan_image(titan_name: str) -> str:
     images = _ALL_TITAN_IMAGES.get(titan_name)
@@ -75,7 +78,8 @@ def get_titan_image(titan_name: str) -> str:
         return random.choice(images)
     return SURVEY_CORPS_ICON
 
-def attach_image(embed: discord.Embed, path: str, as_thumbnail=False) -> discord.File | None:
+
+def attach_image(embed: discord.Embed, path: str, as_thumbnail=False) -> "discord.File | None":
     if not path or not os.path.exists(path):
         return None
     filename = os.path.basename(path)
@@ -99,9 +103,7 @@ class PlayerData:
     losses:     int = 0
     kills:      int = 0
     coins:      int = 0
-    # collection: {titan_name: count}
     collection: dict = field(default_factory=dict)
-    # active titan for battles
     active_titan: str = ""
 
     @property
@@ -128,13 +130,36 @@ class PlayerData:
         return sum(self.collection.values())
 
     def best_titan(self) -> Optional[str]:
-        """Return the titan with the highest rarity in the collection."""
         order = ["Legendary", "Epic", "Rare", "Uncommon", "Common"]
         for rarity in order:
             for name, stats in TITAN_STATS.items():
                 if stats["rarity"] == rarity and self.collection.get(name, 0) > 0:
                     return name
         return None
+
+    def to_dict(self) -> dict:
+        return {
+            "user_id": self.user_id,
+            "username": self.username,
+            "scout_name": self.scout_name,
+            "level": self.level,
+            "xp": self.xp,
+            "wins": self.wins,
+            "losses": self.losses,
+            "kills": self.kills,
+            "coins": self.coins,
+            "active_titan": self.active_titan,
+            "collection": self.collection,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "PlayerData":
+        d.setdefault("kills", 0)
+        d.setdefault("coins", 0)
+        d.setdefault("collection", {})
+        d.setdefault("active_titan", "")
+        return cls(**{k: v for k, v in d.items() if k != "collection"},
+                   collection=d["collection"])
 
 
 @dataclass
@@ -162,7 +187,7 @@ class PvPSession:
     opponent_hp:      int
     challenger_max:   int
     opponent_max:     int
-    current_turn:     str  = ""   # user_id whose turn it is
+    current_turn:     str  = ""
     round_num:        int  = 1
     active:           bool = True
     message_id:       int  = 0
@@ -172,92 +197,48 @@ class PvPSession:
 class GameState:
     _players:  dict[str, PlayerData]    = {}
     _battles:  dict[str, BattleSession] = {}
-    _pvp:      dict[str, PvPSession]    = {}   # key = challenger_id
-    _settings: dict = {}
+    _pvp:      dict[str, PvPSession]    = {}
 
-    # ── persistence ───────────────────────────────────────────────────────
+    # ── player management (async, SQLite-backed) ──────────────────────────
     @classmethod
-    def _ensure_dir(cls):
-        os.makedirs("data", exist_ok=True)
-
-    @classmethod
-    def _load(cls):
-        cls._ensure_dir()
-        if not os.path.exists(DATA_FILE):
-            return
-        try:
-            with open(DATA_FILE, encoding="utf-8") as f:
-                raw = json.load(f)
-            for uid, d in raw.items():
-                d.setdefault("kills", 0)
-                d.setdefault("coins", 0)
-                d.setdefault("collection", {})
-                d.setdefault("active_titan", "")
-                cls._players[uid] = PlayerData(**d)
-        except Exception as e:
-            print(f"[GameState] Could not load player data: {e}")
+    async def get_player(cls, user_id: str, username: str) -> PlayerData:
+        """Fetch player from DB (or in-memory cache)."""
+        if user_id in cls._players:
+            return cls._players[user_id]
+        if _DB_AVAILABLE:
+            d = await Database.get_player(user_id, username)
+            p = PlayerData.from_dict(d)
+        else:
+            p = PlayerData(user_id=user_id, username=username)
+        cls._players[user_id] = p
+        return p
 
     @classmethod
-    def _save(cls):
-        cls._ensure_dir()
-        try:
-            with open(DATA_FILE, "w", encoding="utf-8") as f:
-                json.dump(
-                    {uid: asdict(p) for uid, p in cls._players.items()},
-                    f, indent=2
-                )
-        except Exception as e:
-            print(f"[GameState] Could not save player data: {e}")
-
-    @classmethod
-    def load_settings(cls):
-        cls._ensure_dir()
-        if os.path.exists(SETTINGS_FILE):
-            try:
-                with open(SETTINGS_FILE, encoding="utf-8") as f:
-                    cls._settings = json.load(f)
-            except Exception:
-                cls._settings = {}
-
-    @classmethod
-    def save_settings(cls):
-        cls._ensure_dir()
-        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-            json.dump(cls._settings, f, indent=2)
-
-    @classmethod
-    def get_spawn_channel(cls, guild_id: int) -> Optional[int]:
-        cls.load_settings()
-        return cls._settings.get(str(guild_id), {}).get("spawn_channel")
-
-    @classmethod
-    def set_spawn_channel(cls, guild_id: int, channel_id: int):
-        cls.load_settings()
-        cls._settings.setdefault(str(guild_id), {})["spawn_channel"] = channel_id
-        cls.save_settings()
-
-    # ── player management ─────────────────────────────────────────────────
-    @classmethod
-    def get_player(cls, user_id: str, username: str) -> PlayerData:
-        if not cls._players:
-            cls._load()
-        if user_id not in cls._players:
-            cls._players[user_id] = PlayerData(user_id=user_id, username=username)
-            cls._save()
-        return cls._players[user_id]
-
-    @classmethod
-    def save_player(cls, player: PlayerData):
+    async def save_player(cls, player: PlayerData) -> None:
         cls._players[player.user_id] = player
-        cls._save()
+        if _DB_AVAILABLE:
+            await Database.save_player(player.to_dict())
 
     @classmethod
-    def all_players(cls) -> list[PlayerData]:
-        if not cls._players:
-            cls._load()
+    async def all_players(cls) -> list[PlayerData]:
+        if _DB_AVAILABLE:
+            rows = await Database.all_players()
+            return [PlayerData.from_dict(r) for r in rows]
         return list(cls._players.values())
 
-    # ── PvE battles ───────────────────────────────────────────────────────
+    # ── guild settings ────────────────────────────────────────────────────
+    @classmethod
+    async def get_spawn_channel(cls, guild_id: int) -> Optional[int]:
+        if _DB_AVAILABLE:
+            return await Database.get_spawn_channel(guild_id)
+        return None
+
+    @classmethod
+    async def set_spawn_channel(cls, guild_id: int, channel_id: int) -> None:
+        if _DB_AVAILABLE:
+            await Database.set_spawn_channel(guild_id, channel_id)
+
+    # ── PvE battles (in-memory) ───────────────────────────────────────────
     @classmethod
     def start_battle(cls, player_id, scout_name, titan_name, channel_id) -> BattleSession:
         t = TITAN_STATS.get(titan_name, {"hp": 300, "atk": 60, "def": 50, "spd": 50})
@@ -283,7 +264,7 @@ class GameState:
     def end_battle(cls, player_id: str):
         cls._battles.pop(player_id, None)
 
-    # ── PvP management ────────────────────────────────────────────────────
+    # ── PvP (in-memory) ───────────────────────────────────────────────────
     @classmethod
     def start_pvp(cls, challenger_id, opponent_id, c_titan, o_titan) -> PvPSession:
         cs  = TITAN_STATS.get(c_titan,  {"hp": 300})
@@ -311,12 +292,12 @@ class GameState:
 
 # ── Move definitions ───────────────────────────────────────────────────────
 MOVES: dict[str, dict] = {
-    "slash":         {"label": "⚔️ Slash",          "dmg": (40, 70),  "miss": 0.10, "desc": "slashes at the nape!"},
-    "odm_dash":      {"label": "🪺 ODM Dash",        "dmg": (25, 55),  "miss": 0.05, "desc": "dashes in on ODM gear!"},
-    "thunder_spear": {"label": "💥 Thunder Spear",   "dmg": (60, 100), "miss": 0.20, "desc": "fires a Thunder Spear!"},
-    "spiral_cut":    {"label": "🌀 Spiral Cut",      "dmg": (35, 65),  "miss": 0.12, "desc": "performs a spiral cut!"},
-    "titan_smash":   {"label": "🧱 Titan Smash",     "dmg": (55, 90),  "miss": 0.18, "desc": "unleashes a titan smash!"},
-    "defend":        {"label": "🛡️ Defend",          "dmg": (0,  0),   "miss": 0.00, "desc": "takes a defensive stance!"},
+    "slash":         {"label": "\u2694\ufe0f Slash",          "dmg": (40, 70),  "miss": 0.10, "desc": "slashes at the nape!"},
+    "odm_dash":      {"label": "\U0001fab6 ODM Dash",        "dmg": (25, 55),  "miss": 0.05, "desc": "dashes in on ODM gear!"},
+    "thunder_spear": {"label": "\U0001f4a5 Thunder Spear",   "dmg": (60, 100), "miss": 0.20, "desc": "fires a Thunder Spear!"},
+    "spiral_cut":    {"label": "\U0001f300 Spiral Cut",      "dmg": (35, 65),  "miss": 0.12, "desc": "performs a spiral cut!"},
+    "titan_smash":   {"label": "\U0001f9f1 Titan Smash",     "dmg": (55, 90),  "miss": 0.18, "desc": "unleashes a titan smash!"},
+    "defend":        {"label": "\U0001f6e1\ufe0f Defend",    "dmg": (0,  0),   "miss": 0.00, "desc": "takes a defensive stance!"},
 }
 
 
@@ -331,11 +312,11 @@ def calc_move(move_key: str, attacker_is_scout: bool) -> tuple[int, bool, str]:
 
 def titan_ai_move() -> tuple[int, bool, str]:
     moves = {
-        "stomp":          {"dmg": (30, 65), "miss": 0.10, "label": "🧱 stomps the ground!"},
-        "swipe":          {"dmg": (25, 55), "miss": 0.08, "label": "👊 swipes with a massive arm!"},
-        "boulder_throw":  {"dmg": (50, 85), "miss": 0.22, "label": "🪨 hurls a boulder!"},
-        "roar":           {"dmg": (15, 30), "miss": 0.05, "label": "🗣️ unleashes a devastating roar!"},
-        "crystal_harden": {"dmg": (40, 70), "miss": 0.15, "label": "💎 uses crystal hardening!"},
+        "stomp":          {"dmg": (30, 65), "miss": 0.10, "label": "\U0001f9f1 stomps the ground!"},
+        "swipe":          {"dmg": (25, 55), "miss": 0.08, "label": "\U0001f44a swipes with a massive arm!"},
+        "boulder_throw":  {"dmg": (50, 85), "miss": 0.22, "label": "\U0001fab8 hurls a boulder!"},
+        "roar":           {"dmg": (15, 30), "miss": 0.05, "label": "\U0001f5e3\ufe0f unleashes a devastating roar!"},
+        "crystal_harden": {"dmg": (40, 70), "miss": 0.15, "label": "\U0001f48e uses crystal hardening!"},
     }
     key = random.choice(list(moves.keys()))
     m   = moves[key]
@@ -349,7 +330,6 @@ def pvp_titan_attack(attacker_titan: str, defender_titan: str) -> tuple[int, boo
     """Calculate PvP attack damage based on titan stats."""
     a_stats = TITAN_STATS.get(attacker_titan, {"atk": 60, "def": 50, "spd": 60})
     d_stats = TITAN_STATS.get(defender_titan, {"atk": 60, "def": 50, "spd": 60})
-    # miss based on speed difference
     miss_chance = max(0.05, 0.15 - (a_stats["spd"] - d_stats["spd"]) * 0.001)
     if random.random() < miss_chance:
         return 0, True, "attacks but MISSES!"

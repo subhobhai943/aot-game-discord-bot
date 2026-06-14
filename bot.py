@@ -18,31 +18,23 @@ DEFAULT_PREFIX = ">"
 
 import cogs.settings
 
-# Guild prefix storage (in-memory; replace with DB if you want persistence)
-_PREFIXES: dict[int, str] = {}
-
 
 def get_prefix(bot, message):
+    """Return the custom prefix for the guild, falling back to DEFAULT_PREFIX."""
     p = DEFAULT_PREFIX
     if message.guild:
         guild_p = cogs.settings.get_prefix(message.guild.id)
+        # get_prefix returns '!' when no custom prefix is set; treat that as
+        # "not configured" and fall back to DEFAULT_PREFIX.
         if guild_p != "!":
             p = guild_p
-        elif message.guild.id in _PREFIXES:
-            p = _PREFIXES[message.guild.id]
-    
+
     prefixes = [p]
-    # Add variant with space if it doesn't have one, or without if it does
+    # Also accept the prefix followed by a space
     if not p.endswith(" "):
         prefixes.append(f"{p} ")
-    
-    # Add lowercase variants
-    lower_p = p.lower()
-    if lower_p != p:
-        prefixes.append(lower_p)
-        if not lower_p.endswith(" "):
-            prefixes.append(f"{lower_p} ")
-            
+
+    # Longer prefixes must come first so discord.py matches them greedily
     prefixes.sort(key=len, reverse=True)
     return commands.when_mentioned_or(*prefixes)(bot, message)
 
@@ -68,8 +60,8 @@ COGS = [
     "cogs.titan_catch",
     "cogs.pvp",
     "cogs.leaderboard",
-    "cogs.owogames",
     "cogs.titan_game",
+    "cogs.among_titans",   # FIX: was missing from COGS list
 ]
 
 
@@ -84,8 +76,6 @@ class AoTBot(commands.Bot):
         self.http_session: aiohttp.ClientSession | None = None
 
     async def setup_hook(self):
-        # Create a single shared aiohttp session for the whole bot lifecycle.
-        # This is injected into utils/gifs.py so every GIF fetch reuses it.
         self.http_session = aiohttp.ClientSession()
         gifs_module.SESSION = self.http_session
 
@@ -109,7 +99,6 @@ class AoTBot(commands.Bot):
             print(f"  [FAIL] Slash sync failed: {e}")
 
     async def close(self):
-        # Cleanly close the shared HTTP session on shutdown
         if self.http_session and not self.http_session.closed:
             await self.http_session.close()
         await super().close()
@@ -129,14 +118,13 @@ class AoTBot(commands.Bot):
 
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandNotFound):
-            return  # Silently ignore unknown commands
+            return
         if isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send(f"❌ Missing argument: `{error.param.name}`")
+            await ctx.send(f"\u274c Missing argument: `{error.param.name}`")
             return
         if isinstance(error, commands.BadArgument):
-            await ctx.send(f"❌ Bad argument. Did you mention a valid user?")
+            await ctx.send(f"\u274c Bad argument. Did you mention a valid user?")
             return
-        # Re-raise everything else so it shows in logs
         raise error
 
 
