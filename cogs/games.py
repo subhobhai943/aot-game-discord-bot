@@ -242,9 +242,9 @@ class Games(commands.Cog):
         xp_gained = score * (10 if difficulty == "easy" else 15 if difficulty == "medium" else 20)
         embed.add_field(name="💰 Rewards", value=f"+{xp_gained} XP", inline=True)
 
-        player = GameState.get_player(str(interaction.user.id), interaction.user.display_name)
+        player = await GameState.get_player(str(interaction.user.id), interaction.user.display_name)
         player.add_xp(xp_gained)
-        GameState.save_player(player)
+        await GameState.save_player(player)
 
         embed.add_field(name="🔖 New Level", value=f"Level {player.level} ({player.xp}/{player.xp_needed} XP)", inline=True)
         embed.set_footer(text="Remember: Speed is everything in ODM combat!")

@@ -349,7 +349,7 @@ class Battle(commands.Cog):
         )
 
     # ── >fight prefix command ──────────────────────────────────────────────
-    @commands.command(name="fight", aliases=["pve", "battle", "startbattle"])
+    @commands.command(name="fight", aliases=["pve", "startbattle"])
     async def fight_prefix(self, ctx: commands.Context, *, args: str = ""):
         """Start a PvE battle.  Usage: >fight <character> vs <titan>"""
         uid = str(ctx.author.id)

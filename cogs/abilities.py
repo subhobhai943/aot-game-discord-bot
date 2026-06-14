@@ -17,7 +17,7 @@ class Abilities(commands.Cog):
     @app_commands.command(name="ability", description="Use your scout's special ability!")
     async def use_ability(self, interaction: discord.Interaction):
         """Activate your chosen scout's signature ability."""
-        player = GameState.get_player(str(interaction.user.id), interaction.user.display_name)
+        player = await GameState.get_player(str(interaction.user.id), interaction.user.display_name)
         
         abilities_db = {
             "Levi Ackerman": {
@@ -110,7 +110,7 @@ class Abilities(commands.Cog):
         
         # Grant XP for using ability
         player.add_xp(15)
-        GameState.save_player(player)
+        await GameState.save_player(player)
         
         await interaction.response.send_message(embed=embed)
 
@@ -227,9 +227,9 @@ class Abilities(commands.Cog):
             embed.set_image(url=gif_url)
         
         # Grant XP for transformation
-        player = GameState.get_player(str(interaction.user.id), interaction.user.display_name)
+        player = await GameState.get_player(str(interaction.user.id), interaction.user.display_name)
         player.add_xp(25)
-        GameState.save_player(player)
+        await GameState.save_player(player)
         
         embed.set_footer(text=f"+25 XP! | Level {player.level} now | You feel the power of the Titans coursing through you!")
         
@@ -240,7 +240,7 @@ class Abilities(commands.Cog):
     @app_commands.command(name="gear-upgrade", description="Upgrade your ODM gear and equipment!")
     async def gear_upgrade(self, interaction: discord.Interaction):
         """View and upgrade your ODM gear components."""
-        player = GameState.get_player(str(interaction.user.id), interaction.user.display_name)
+        player = await GameState.get_player(str(interaction.user.id), interaction.user.display_name)
         
         # Initialize gear data if not present
         if not hasattr(player, 'gear_data'):

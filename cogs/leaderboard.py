@@ -28,7 +28,7 @@ class Leaderboard(commands.Cog):
             await ctx.send(f"❌ Invalid category. Choose from: `{'`, `'.join(valid)}`")
             return
 
-        players = GameState.all_players()
+        players = await GameState.all_players()
         if not players:
             await ctx.send("No players found yet! Start playing with `>catch`!")
             return
@@ -64,7 +64,7 @@ class Leaderboard(commands.Cog):
         embed.description = "\n".join(lines) if lines else "No data yet!"
 
         # Show caller's rank
-        caller = GameState.get_player(str(ctx.author.id), ctx.author.display_name)
+        caller = await GameState.get_player(str(ctx.author.id), ctx.author.display_name)
         try:
             caller_rank = sorted_p.index(caller) + 1
             embed.set_footer(text=f"Your rank: #{caller_rank} out of {len(sorted_p)} scouts")
@@ -84,8 +84,8 @@ class Leaderboard(commands.Cog):
     async def myrank(self, ctx: commands.Context, member: discord.Member = None):
         """Check your rank across all categories. Usage: >myrank [@user]"""
         target = member or ctx.author
-        player = GameState.get_player(str(target.id), target.display_name)
-        players = GameState.all_players()
+        player = await GameState.get_player(str(target.id), target.display_name)
+        players = await GameState.all_players()
 
         wins_rank   = sorted(players, key=lambda p: (p.wins, p.kills),      reverse=True)
         level_rank  = sorted(players, key=lambda p: (p.level, p.xp),        reverse=True)

@@ -13,7 +13,7 @@ class Profile(commands.Cog):
     @app_commands.describe(user="Mention a user to view their profile (leave blank for your own)")
     async def profile(self, interaction: discord.Interaction, user: discord.Member = None):
         target = user or interaction.user
-        player = GameState.get_player(str(target.id), target.display_name)
+        player = await GameState.get_player(str(target.id), target.display_name)
 
         img_buf = generate_profile_card(
             username=target.display_name,
@@ -52,9 +52,9 @@ class Profile(commands.Cog):
         interaction: discord.Interaction,
         character: app_commands.Choice[str],
     ):
-        player = GameState.get_player(str(interaction.user.id), interaction.user.display_name)
+        player = await GameState.get_player(str(interaction.user.id), interaction.user.display_name)
         player.scout_name = character.value
-        GameState.save_player(player)
+        await GameState.save_player(player)
         await interaction.response.send_message(
             f"✅ You are now playing as **{character.value}**!\nUse `/fight` to start a battle.",
             ephemeral=True

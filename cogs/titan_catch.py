@@ -79,13 +79,13 @@ class CatchView(discord.ui.View):
         button.style = discord.ButtonStyle.success
         await interaction.message.edit(view=self)
 
-        player = GameState.get_player(str(interaction.user.id), interaction.user.display_name)
+        player = await GameState.get_player(str(interaction.user.id), interaction.user.display_name)
         player.add_titan(self.titan_name)
         player.add_xp(20)
         player.coins += 10
         if not player.active_titan:
             player.active_titan = self.titan_name
-        GameState.save_player(player)
+        await GameState.save_player(player)
 
         stats  = TITAN_STATS[self.titan_name]
         rarity = stats["rarity"]
@@ -137,7 +137,7 @@ class TitanCatch(commands.Cog):
         import time
         now = time.time()
         for guild in self.bot.guilds:
-            channel_id = GameState.get_spawn_channel(guild.id)
+            channel_id = await GameState.get_spawn_channel(guild.id)
             if not channel_id:
                 continue
             if now < self._next_spawn.get(guild.id, 0):
@@ -168,7 +168,7 @@ class TitanCatch(commands.Cog):
     async def setspawn(self, ctx: commands.Context, channel: discord.TextChannel = None):
         """Admin: Set the titan spawn channel. Usage: >setspawn #channel"""
         ch = channel or ctx.channel
-        GameState.set_spawn_channel(ctx.guild.id, ch.id)
+        await GameState.set_spawn_channel(ctx.guild.id, ch.id)
         embed = discord.Embed(
             title="✅ Spawn Channel Set",
             description=f"Titans will now randomly spawn in {ch.mention}!",
@@ -192,7 +192,7 @@ class TitanCatch(commands.Cog):
     async def collection(self, ctx: commands.Context, member: discord.Member = None):
         """View your (or another user's) titan collection. Usage: >collection [@user]"""
         target = member or ctx.author
-        player = GameState.get_player(str(target.id), target.display_name)
+        player = await GameState.get_player(str(target.id), target.display_name)
 
         if not player.collection:
             await ctx.send(f"{'You have' if target == ctx.author else f'{target.display_name} has'} no titans yet! Wait for one to spawn.")
@@ -228,14 +228,14 @@ class TitanCatch(commands.Cog):
     @commands.command(name="setactive", aliases=["sa"])
     async def setactive(self, ctx: commands.Context, *, titan_name: str):
         """Set your active titan for battles. Usage: >setactive Jaw Titan"""
-        player = GameState.get_player(str(ctx.author.id), ctx.author.display_name)
+        player = await GameState.get_player(str(ctx.author.id), ctx.author.display_name)
         match = next((t for t in player.collection if t.lower() == titan_name.lower()), None)
         if not match:
             owned = ", ".join(player.collection.keys()) or "none"
             await ctx.send(f"❌ You don't own **{titan_name}**. Your titans: `{owned}`")
             return
         player.active_titan = match
-        GameState.save_player(player)
+        await GameState.save_player(player)
         stats = TITAN_STATS[match]
         embed = discord.Embed(
             title="✅ Active Titan Set!",
@@ -280,7 +280,7 @@ class TitanCatch(commands.Cog):
     @commands.command(name="release")
     async def release(self, ctx: commands.Context, *, titan_name: str):
         """Release a titan from your collection. Usage: >release Pure Titan"""
-        player = GameState.get_player(str(ctx.author.id), ctx.author.display_name)
+        player = await GameState.get_player(str(ctx.author.id), ctx.author.display_name)
         match  = next((t for t in player.collection if t.lower() == titan_name.lower()), None)
         if not match:
             await ctx.send(f"❌ You don't own **{titan_name}**.")
@@ -291,7 +291,7 @@ class TitanCatch(commands.Cog):
         if player.active_titan == match and match not in player.collection:
             player.active_titan = player.best_titan() or ""
         player.coins += 5
-        GameState.save_player(player)
+        await GameState.save_player(player)
         await ctx.send(f"🔓 Released **{match}** and received **+5 coins**.")
 
 

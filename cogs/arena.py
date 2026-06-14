@@ -135,13 +135,13 @@ class MoveView(discord.ui.View):
         if session.titan_hp <= 0:
             session.last_action = " | ".join(log_lines)
             session.active = False
-            player = GameState.get_player(
+            player = await GameState.get_player(
                 self.player_id, interaction.user.display_name
             )
             player.wins += 1
             player.kills += 1
             levelled = player.add_xp(80)
-            GameState.save_player(player)
+            await GameState.save_player(player)
             GameState.end_battle(self.player_id)
 
             img = generate_battle_image(
@@ -196,12 +196,12 @@ class MoveView(discord.ui.View):
         # ── Scout dies ─────────────────────────────────────────────────────
         if session.scout_hp <= 0:
             session.active = False
-            player = GameState.get_player(
+            player = await GameState.get_player(
                 self.player_id, interaction.user.display_name
             )
             player.losses += 1
             player.add_xp(20)
-            GameState.save_player(player)
+            await GameState.save_player(player)
             GameState.end_battle(self.player_id)
 
             img = generate_battle_image(
@@ -276,7 +276,7 @@ class Arena(commands.Cog):
         os.makedirs("data", exist_ok=True)
 
     @app_commands.command(
-        name="fight",
+        name="arena",
         description="Start a turn-based battle against a Titan with live battle images!",
     )
     @app_commands.describe(titan="Choose your titan opponent")
@@ -288,7 +288,7 @@ class Arena(commands.Cog):
         interaction: discord.Interaction,
         titan: app_commands.Choice[str],
     ):
-        player = GameState.get_player(
+        player = await GameState.get_player(
             str(interaction.user.id), interaction.user.display_name
         )
         existing = GameState.get_battle(str(interaction.user.id))
@@ -340,11 +340,11 @@ class Arena(commands.Cog):
                 "\u274c You have no active battle.", ephemeral=True
             )
             return
-        player = GameState.get_player(
+        player = await GameState.get_player(
             str(interaction.user.id), interaction.user.display_name
         )
         player.losses += 1
-        GameState.save_player(player)
+        await GameState.save_player(player)
         GameState.end_battle(str(interaction.user.id))
         await interaction.response.send_message(
             f"\U0001f3c3 **{session.scout_name}** fled from "

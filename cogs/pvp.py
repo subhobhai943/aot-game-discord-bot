@@ -139,8 +139,8 @@ class PvP(commands.Cog):
             await ctx.send("\u274c You can't battle a bot or yourself!")
             return
 
-        c_player = GameState.get_player(str(ctx.author.id), ctx.author.display_name)
-        o_player = GameState.get_player(str(opponent.id), opponent.display_name)
+        c_player = await GameState.get_player(str(ctx.author.id), ctx.author.display_name)
+        o_player = await GameState.get_player(str(opponent.id), opponent.display_name)
 
         prefix = ctx.prefix or ">"
 
@@ -297,13 +297,13 @@ class PvP(commands.Cog):
 
         winner_member = ctx.guild.get_member(int(winner_id))
         loser_member  = ctx.guild.get_member(int(loser_id))
-        w_player = GameState.get_player(winner_id, winner_member.display_name if winner_member else "?")
-        l_player = GameState.get_player(loser_id,  loser_member.display_name  if loser_member  else "?")
+        w_player = await GameState.get_player(winner_id, winner_member.display_name if winner_member else "?")
+        l_player = await GameState.get_player(loser_id,  loser_member.display_name  if loser_member  else "?")
 
         w_player.wins   += 1; w_player.kills += 1; w_player.coins += 50; w_player.add_xp(100)
         l_player.losses += 1; l_player.add_xp(30)
-        GameState.save_player(w_player)
-        GameState.save_player(l_player)
+        await GameState.save_player(w_player)
+        await GameState.save_player(l_player)
         GameState.end_pvp(session)
         self._log.pop(log_key, None)
 
