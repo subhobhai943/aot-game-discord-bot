@@ -3,7 +3,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-# ─── Category definitions ──────────────────────────────────────────────────────
+# ─── Category definitions ─────────────────────────────────────────────────────────────────────────────
 CATEGORIES = [
     {
         "id": "battle",
@@ -151,6 +151,40 @@ CATEGORIES = [
         ],
     },
     {
+        "id": "music",
+        "label": "🎵 Music",
+        "emoji": "🎵",
+        "color": 0x1DB954,
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
+        "desc": "Stream music into a voice channel from YouTube, Spotify names, or any direct URL.",
+        "fields": [
+            ("/play <query>  |  >p <query>",     "Join VC and play a song (YouTube / Spotify name / URL)"),
+            ("/skip          |  >skip",           "Skip the current song and play the next in queue"),
+            ("/pause         |  >pause",          "Pause playback"),
+            ("/resume        |  >resume",         "Resume a paused track"),
+            ("/stop          |  >stop",           "Stop music, clear the queue, and disconnect"),
+            ("/queue         |  >queue / >q",     "Show the current music queue"),
+            ("Tip", "You must be in a voice channel to use music commands."),
+        ],
+    },
+    {
+        "id": "video",
+        "label": "📹 Video",
+        "emoji": "📹",
+        "color": 0xFF0000,
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
+        "desc": "Stream video directly into a Discord voice channel via Go Live (720p · 30 fps · H.264). Powered by discord-video-stream-py.",
+        "fields": [
+            ("/vplay <query>  |  >vplay <query>",  "Join VC, start Go Live, and stream a video (YouTube / URL / search term)"),
+            ("/vskip         |  >vskip",           "Skip the current video and play the next in queue"),
+            ("/vpause        |  >vpause",          "Pause the video stream"),
+            ("/vresume       |  >vresume",         "Resume a paused video stream"),
+            ("/vstop         |  >vstop",           "Stop the stream, clear queue, and disconnect"),
+            ("/vqueue        |  >vqueue / >vq",    "Show the current video queue"),
+            ("Tip", "The bot account must have Go Live permission in the server. Bare search terms are auto-resolved via yt-dlp."),
+        ],
+    },
+    {
         "id": "moderation",
         "label": "🛡️ Moderation",
         "emoji": "🛡️",
@@ -184,7 +218,7 @@ CATEGORIES = [
 CAT_MAP = {c["id"]: c for c in CATEGORIES}
 
 
-# ─── Embed builders ───────────────────────────────────────────────────────────
+# ─── Embed builders ─────────────────────────────────────────────────────────────────────────────
 def _overview_embed() -> discord.Embed:
     embed = discord.Embed(
         title="<:wings:1234> AoT Game Bot",
@@ -227,7 +261,7 @@ def _category_embed(cat_id: str) -> discord.Embed:
     return embed
 
 
-# ─── UI Components ────────────────────────────────────────────────────────────
+# ─── UI Components ─────────────────────────────────────────────────────────────────────────────
 class HelpDropdown(discord.ui.Select):
     def __init__(self):
         options = [discord.SelectOption(label="🏠 Overview", value="overview", description="Bot overview and all categories")]
@@ -242,7 +276,6 @@ class HelpDropdown(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         val = self.values[0]
         embed = _overview_embed() if val == "overview" else _category_embed(val)
-        # Update button styles to highlight current page
         view: HelpView = self.view  # type: ignore
         view.current = val
         view._refresh_buttons()
@@ -250,8 +283,8 @@ class HelpDropdown(discord.ui.Select):
 
 
 class HelpView(discord.ui.View):
-    # We show max 5 buttons per row; first row = prev/home/next + 2 quick jumps
-    QUICK = ["battle", "titans", "reactions", "games", "profile"]  # 5 pinned quick-access
+    # Row 1: 5 pinned quick-access category buttons
+    QUICK = ["battle", "titans", "reactions", "music", "video"]
 
     def __init__(self, current: str = "overview", author_id: int = 0):
         super().__init__(timeout=180)
@@ -260,7 +293,7 @@ class HelpView(discord.ui.View):
         self.all_ids = ["overview"] + [c["id"] for c in CATEGORIES]
         self._build()
 
-    # ── Build all items ──────────────────────────────────────────────────────
+    # ── Build all items ─────────────────────────────────────────────────────────────────────────────
     def _build(self):
         self.clear_items()
         # Row 0: navigation  ◀  🏠  ▶
@@ -274,7 +307,7 @@ class HelpView(discord.ui.View):
                                 row=0))
         self.add_item(NavButton("▶", next_id, discord.ButtonStyle.secondary, row=0))
 
-        # Row 1: 5 quick-access category buttons
+        # Row 1: 5 quick-access category buttons (battle / titans / reactions / music / video)
         for cat_id in self.QUICK:
             cat = CAT_MAP[cat_id]
             style = discord.ButtonStyle.primary if self.current == cat_id else discord.ButtonStyle.secondary
@@ -305,7 +338,7 @@ class NavButton(discord.ui.Button):
         await interaction.response.edit_message(embed=embed, view=view)
 
 
-# ─── Cog ─────────────────────────────────────────────────────────────────────
+# ─── Cog ─────────────────────────────────────────────────────────────────────────────────────────
 class Help(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
