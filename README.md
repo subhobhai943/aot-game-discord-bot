@@ -8,6 +8,7 @@ Powered by [aot-toolkit](https://github.com/subhobhai943/aot-toolkit) • Built 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?style=for-the-badge&logo=python)](https://www.python.org/)
 [![discord.py](https://img.shields.io/badge/discord.py-2.3%2B-5865F2?style=for-the-badge&logo=discord)](https://discordpy.readthedocs.io/)
 [![aot-toolkit](https://img.shields.io/badge/aot--toolkit-latest-green?style=for-the-badge)](https://github.com/subhobhai943/aot-toolkit)
+[![discord-video-stream-py](https://img.shields.io/badge/discord--video--stream--py-0.1.0-orange?style=for-the-badge)](https://github.com/subhobhai943/discord-video-stream-py)
 [![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)](LICENSE)
 
 </div>
@@ -30,6 +31,8 @@ Powered by [aot-toolkit](https://github.com/subhobhai943/aot-toolkit) • Built 
 | ⚡ **Character Abilities** | Scout special powers & Titan Transformation Simulator |
 | 🛠️ **Gear Upgrades** | Upgrade ODM blades, gas tanks, handles, and thrusters |
 | 🧩 **Mikasa Mode** | Red scarf, protection, devotion, and Ackerman bond features |
+| 🎵 **Music Player** | Stream audio from YouTube, Spotify names, or any URL |
+| 📹 **Video Streaming** | Stream video directly into Discord voice channels via Go Live |
 
 ---
 
@@ -99,6 +102,28 @@ Every `/fight` turn dynamically generates a **fresh battle image** using Pillow:
 | `/odm_grapple <distance> [speed] [gas]` | Simulate an ODM gear grapple |
 | `/odm_strike [armor_level] [abilities]` | Simulate a nape strike on a titan |
 
+### 🎵 Music Commands
+| Command | Prefix | Description |
+|---|---|---|
+| `/play <query>` | `>p <query>` | Play a song from YouTube, Spotify name, or URL |
+| `/skip` | `>skip` | Skip the current song |
+| `/pause` | `>pause` | Pause playback |
+| `/resume` | `>resume` | Resume playback |
+| `/stop` | `>stop` | Stop music and clear the queue |
+| `/queue` | `>queue` | View the music queue |
+
+### 📹 Video Streaming Commands
+| Command | Prefix | Description |
+|---|---|---|
+| `/vplay <query>` | `>vplay <query>` | Stream a video into a voice channel via Go Live |
+| `/vskip` | `>vskip` | Skip the current video |
+| `/vpause` | `>vpause` | Pause the video stream |
+| `/vresume` | `>vresume` | Resume the video stream |
+| `/vstop` | `>vstop` | Stop the stream and disconnect |
+| `/vqueue` | `>vqueue` / `>vq` | View the video queue |
+
+> **Note:** Video streaming uses [discord-video-stream-py](https://github.com/subhobhai943/discord-video-stream-py) and requires the bot account to have Go Live permissions in the server. Streams at **720p · 30fps · H.264**.
+
 ---
 
 ## 📊 Battle Moves
@@ -164,11 +189,14 @@ pip install -r requirements.txt
 ### Requirements
 
 ```
-discord.py>=2.3.0
+discord.py[voice]>=2.3.0
 aot-toolkit
-python-dotenv
-Pillow>=10.0.0
-aiohttp>=3.8.0
+python-dotenv>=1.0.0
+Pillow
+aiohttp>=3.9.0
+yt-dlp>=2024.1.1
+PyNaCl>=1.5.0
+discord-video-stream-py>=0.1.0
 ```
 
 ---
@@ -192,18 +220,37 @@ aiohttp>=3.8.0
 
 ```
 aot-game-discord-bot/
-├── bot.py                  # Main entry point
+├── bot.py                  # Main entry point & cog loader
 ├── cogs/
 │   ├── arena.py            # Turn-based battle system + button UI
-│   ├── profile.py          # Player profile card generation
 │   ├── battle.py           # Narrative battle simulation
+│   ├── abilities.py        # Scout abilities & titan transforms
+│   ├── profile.py          # Player profile card generation
 │   ├── lore.py             # Character / titan / quote lookup
-│   └── odm.py              # ODM gear mini-game
+│   ├── odm.py              # ODM gear mini-game
+│   ├── games.py            # Trivia, spawn simulator, ODM training
+│   ├── music.py            # Music player (YouTube / Spotify / URL)
+│   ├── video.py            # Video streaming via Go Live
+│   ├── mikasa.py           # Mikasa / Ackerman bond features
+│   ├── afk.py              # AFK system
+│   ├── automod.py          # Auto-moderation
+│   ├── leaderboard.py      # Scout rankings
+│   ├── pvp.py              # Player vs Player battles
+│   ├── titan_game.py       # Full titan game mode
+│   ├── titan_catch.py      # Titan catching mini-game
+│   ├── among_titans.py     # Among Titans social deduction game
+│   ├── activate_rumbling.py# The Rumbling event
+│   ├── colors.py           # Role color commands
+│   ├── lookup.py           # General lookup utilities
+│   ├── settings.py         # Per-guild prefix settings
+│   └── help.py             # Custom help system
 ├── utils/
 │   ├── image_gen.py        # Pillow battle & profile image generator
-│   └── game_state.py       # Player data, battle sessions, move logic
+│   ├── game_state.py       # Player data, battle sessions, move logic
+│   └── gifs.py             # GIF fetching utilities
 ├── data/
 │   └── player_data.json    # Auto-generated player save file
+├── assets/                 # Static images and assets
 ├── requirements.txt
 ├── .env.example
 └── .gitignore
