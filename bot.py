@@ -54,6 +54,7 @@ COGS = [
     "cogs.afk",
     "cogs.automod",
     "cogs.music",
+    "cogs.video",       # discord-video-stream-py Go Live streaming
     "cogs.colors",
     "cogs.lookup",
     "cogs.activate_rumbling",
@@ -61,7 +62,7 @@ COGS = [
     "cogs.pvp",
     "cogs.leaderboard",
     "cogs.titan_game",
-    "cogs.among_titans",   # FIX: was missing from COGS list
+    "cogs.among_titans",
 ]
 
 
