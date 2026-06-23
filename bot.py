@@ -9,6 +9,12 @@ import utils.gifs as gifs_module
 
 load_dotenv()
 
+import logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+
 INTENTS = discord.Intents.default()
 INTENTS.message_content = True
 INTENTS.members = True
@@ -77,6 +83,10 @@ class AoTBot(commands.Bot):
         self.http_session: aiohttp.ClientSession | None = None
 
     async def setup_hook(self):
+        # Initialize SQLite database helper
+        from utils.db import Database
+        await Database.init()
+
         self.http_session = aiohttp.ClientSession()
         gifs_module.SESSION = self.http_session
 

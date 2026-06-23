@@ -160,7 +160,16 @@ async def _resolve(query: str, loop: asyncio.AbstractEventLoop) -> tuple[str, st
         "no_warnings": True,
         "extract_flat": False,
         "noplaylist": True,
+        "js_runtimes": {"node": {}},
     }
+
+    # Add YouTube cookie authentication
+    _cookies_file = os.getenv("YTDLP_COOKIES_FILE", "cookies.txt")
+    _browser = os.getenv("YTDLP_BROWSER", "")
+    if os.path.isfile(_cookies_file):
+        ydl_opts["cookiefile"] = _cookies_file
+    elif _browser:
+        ydl_opts["cookiesfrombrowser"] = (_browser,)
 
     def _extract():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -174,6 +183,7 @@ async def _resolve(query: str, loop: asyncio.AbstractEventLoop) -> tuple[str, st
             return url, title
 
     return await loop.run_in_executor(None, _extract)
+
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +314,7 @@ class Video(commands.Cog):
 
     # ── prefix commands ──────────────────────────────────────────────────────
 
-    @commands.command(name="vplay", aliases=["vs", "stream"],
+    @commands.command(name="vplay", aliases=["stream"],
                       help="Stream a video into a voice channel (Go Live). Usage: vplay <url or search>")
     async def vplay_prefix(self, ctx: commands.Context, *, query: str):
         """Start a video stream. Accepts YouTube URLs, search terms, or local files."""

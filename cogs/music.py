@@ -39,18 +39,7 @@ def _build_ytdlp_opts() -> dict:
         "no_warnings": True,
         "default_search": "ytsearch",
         "source_address": "0.0.0.0",
-        # tv_embedded is the most permissive innertube client for server use;
-        # web is kept as fallback.
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["tv_embedded", "web"],
-            }
-        },
-        "postprocessors": [{
-            "key": "FFmpegExtractAudio",
-            "preferredcodec": "opus",
-            "preferredquality": "192",
-        }],
+        "js_runtimes": {"node": {}},
     }
 
     # 1. Explicit cookies file
