@@ -7,41 +7,71 @@ import re
 import os
 from collections import deque
 
-# ── yt-dlp options ────────────────────────────────────────────────────────────
-# Use the iOS player client to bypass YouTube's bot-detection / sign-in wall.
-# If a cookies.txt file is present (Netscape format exported from a browser),
-# it is passed automatically for extra reliability.
-_COOKIES_FILE = os.getenv("YTDLP_COOKIES_FILE", "cookies.txt")
+# ── yt-dlp YouTube bot-detection bypass ───────────────────────────────────────
+#
+# YouTube (2026) aggressively blocks unauthenticated requests from all
+# yt-dlp player clients (web, ios, android). The ONLY reliable fix is to
+# pass real logged-in browser cookies.
+#
+# Priority order (first match wins):
+#   1. YTDLP_COOKIES_FILE env var  → path to a cookies.txt (Netscape format)
+#   2. cookies.txt in project root → same format
+#   3. Auto-read from browser      → set YTDLP_BROWSER env var to one of:
+#                                    chrome / firefox / brave / edge / chromium
+#
+# How to export cookies.txt:
+#   - Install the "Get cookies.txt LOCALLY" Chrome/Firefox extension
+#   - Go to youtube.com while logged in → click the extension → Export
+#   - Save as cookies.txt in the bot's root folder (same dir as bot.py)
+#
+# The tv_embedded + web fallback client is the most permissive combination
+# for server-side (headless) use in 2026.
+# ─────────────────────────────────────────────────────────────────────────────
 
-YTDLP_OPTS = {
-    "format": "bestaudio/best",
-    "noplaylist": False,
-    "quiet": True,
-    "no_warnings": True,
-    "default_search": "ytsearch",
-    "source_address": "0.0.0.0",
-    # ↓ KEY FIX: use the iOS innertube client — avoids the "Sign in to confirm
-    #   you're not a bot" error that appears when using the web client.
-    "extractor_args": {
-        "youtube": {
-            "player_client": ["ios", "web"],
-        }
-    },
-    # Pass browser cookies if the file exists (optional but improves reliability)
-    **({"cookiefile": _COOKIES_FILE} if os.path.isfile(_COOKIES_FILE) else {}),
-    "postprocessors": [{
-        "key": "FFmpegExtractAudio",
-        "preferredcodec": "opus",
-        "preferredquality": "192",
-    }],
-}
+_COOKIES_FILE = os.getenv("YTDLP_COOKIES_FILE", "cookies.txt")
+_BROWSER      = os.getenv("YTDLP_BROWSER", "")   # e.g. "chrome", "firefox"
+
+def _build_ytdlp_opts() -> dict:
+    opts = {
+        "format": "bestaudio/best",
+        "noplaylist": False,
+        "quiet": True,
+        "no_warnings": True,
+        "default_search": "ytsearch",
+        "source_address": "0.0.0.0",
+        # tv_embedded is the most permissive innertube client for server use;
+        # web is kept as fallback.
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["tv_embedded", "web"],
+            }
+        },
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "opus",
+            "preferredquality": "192",
+        }],
+    }
+
+    # 1. Explicit cookies file
+    if os.path.isfile(_COOKIES_FILE):
+        opts["cookiefile"] = _COOKIES_FILE
+
+    # 2. Auto-extract cookies from an installed browser (overrides file if set)
+    elif _BROWSER:
+        opts["cookiesfrombrowser"] = (_BROWSER,)  # tuple: (browser_name,)
+
+    return opts
+
+
+YTDLP_OPTS = _build_ytdlp_opts()
 
 FFMPEG_OPTIONS = {
     "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
     "options": "-vn",
 }
 
-# Spotify URL pattern — extract track/playlist name for YouTube search
+# Spotify URL pattern — extract track name for YouTube search
 SPOTIFY_PATTERN = re.compile(r"https?://open\.spotify\.com/(track|playlist|album)/([a-zA-Z0-9]+)")
 
 
@@ -54,7 +84,6 @@ async def extract_info(query: str, loop: asyncio.AbstractEventLoop) -> dict | No
     Extracts audio source URL and metadata from a YouTube link, search term,
     or other yt-dlp supported URL. Spotify links are converted to a YouTube search.
     """
-    # Handle Spotify — convert to search query
     spotify_match = SPOTIFY_PATTERN.match(query)
     if spotify_match:
         track_id = spotify_match.group(2)
@@ -70,7 +99,6 @@ async def extract_info(query: str, loop: asyncio.AbstractEventLoop) -> dict | No
             if info is None:
                 return None
             if "entries" in info:
-                # Playlist or search result — take first entry
                 info = info["entries"][0]
             return info
 
@@ -100,7 +128,6 @@ class MusicQueue:
         return len(self.queue)
 
 
-# Guild queues
 _queues: dict[int, MusicQueue] = {}
 
 
@@ -116,12 +143,7 @@ class Music(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # ─────────────────────────────────────────────
-    # Internal helpers
-    # ─────────────────────────────────────────────
-
     async def _join_channel(self, ctx_or_interaction) -> discord.VoiceClient | None:
-        """Joins the author's voice channel. Works for both prefix & slash ctx."""
         is_interaction = isinstance(ctx_or_interaction, discord.Interaction)
         author = ctx_or_interaction.user if is_interaction else ctx_or_interaction.author
         guild  = ctx_or_interaction.guild
@@ -143,7 +165,6 @@ class Music(commands.Cog):
         return vc
 
     async def _play_next(self, guild: discord.Guild, channel: discord.TextChannel):
-        """Plays the next song in the queue, or announces queue end."""
         queue = get_queue(guild.id)
         info = queue.next()
         if info is None:
@@ -155,7 +176,7 @@ class Music(commands.Cog):
             return
 
         source = await discord.FFmpegOpusAudio.from_probe(info["url"], **FFMPEG_OPTIONS)
-        
+
         def after_play(error):
             if error:
                 print(f"[Music] Playback error: {error}")
@@ -184,9 +205,7 @@ class Music(commands.Cog):
         return f"{minutes}:{secs:02d}"
 
     async def _handle_play(self, guild, author, channel, query: str, vc: discord.VoiceClient):
-        """Core play logic used by both prefix and slash commands."""
         queue = get_queue(guild.id)
-
         await channel.send(f"🔍 Searching for: `{query}`...")
         try:
             info = await extract_info(query, self.bot.loop)
@@ -212,13 +231,10 @@ class Music(commands.Cog):
             queue.add(info)
             await self._play_next(guild, channel)
 
-    # ─────────────────────────────────────────────
-    # Prefix commands
-    # ─────────────────────────────────────────────
+    # ── Prefix commands ──────────────────────────────────────────────────────
 
     @commands.command(name="p", aliases=["play"], help="Play a song from YouTube/Spotify/name. Usage: p <link or name>")
     async def play_prefix(self, ctx: commands.Context, *, query: str):
-        """Prefix play: `p <link or song name>`"""
         vc = await self._join_channel(ctx)
         if vc is None:
             return
@@ -266,11 +282,7 @@ class Music(commands.Cog):
         queue = get_queue(ctx.guild.id)
         embed = discord.Embed(title="🎶 Music Queue", color=discord.Color.blurple())
         if queue.current:
-            embed.add_field(
-                name="▶️ Now Playing",
-                value=f"`{queue.current.get('title', 'Unknown')}`",
-                inline=False,
-            )
+            embed.add_field(name="▶️ Now Playing", value=f"`{queue.current.get('title', 'Unknown')}`", inline=False)
         if queue.queue:
             tracks = "\n".join(
                 f"`{i+1}.` {t.get('title', 'Unknown')} [{self._fmt_duration(t.get('duration'))}]"
@@ -287,16 +299,10 @@ class Music(commands.Cog):
     async def ping_prefix(self, ctx: commands.Context):
         latency_ms = round(self.bot.latency * 1000)
         color = discord.Color.green() if latency_ms < 100 else (discord.Color.yellow() if latency_ms < 200 else discord.Color.red())
-        embed = discord.Embed(
-            title="🏓 Pong!",
-            description=f"Bot latency: **{latency_ms}ms**",
-            color=color,
-        )
+        embed = discord.Embed(title="🏓 Pong!", description=f"Bot latency: **{latency_ms}ms**", color=color)
         await ctx.send(embed=embed)
 
-    # ─────────────────────────────────────────────
-    # Slash commands
-    # ─────────────────────────────────────────────
+    # ── Slash commands ───────────────────────────────────────────────────────
 
     @app_commands.command(name="play", description="Play a song from YouTube, Spotify, or search by name.")
     @app_commands.describe(query="YouTube link, Spotify link, or song name")
@@ -364,11 +370,7 @@ class Music(commands.Cog):
     async def ping_slash(self, interaction: discord.Interaction):
         latency_ms = round(self.bot.latency * 1000)
         color = discord.Color.green() if latency_ms < 100 else (discord.Color.yellow() if latency_ms < 200 else discord.Color.red())
-        embed = discord.Embed(
-            title="🏓 Pong!",
-            description=f"Bot latency: **{latency_ms}ms**",
-            color=color,
-        )
+        embed = discord.Embed(title="🏓 Pong!", description=f"Bot latency: **{latency_ms}ms**", color=color)
         await interaction.response.send_message(embed=embed)
 
 
