@@ -166,11 +166,12 @@ async def _resolve(query: str, loop: asyncio.AbstractEventLoop) -> tuple[str, st
         search_query = f"ytsearch:{query}"
 
     ydl_opts = {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "format": "best[ext=mp4]/best",
         "quiet": True,
         "no_warnings": True,
         "extract_flat": False,
         "noplaylist": True,
+        "js_runtimes": {"node": {}},
     }
 
     _cookies_file = os.getenv("YTDLP_COOKIES_FILE", "cookies.txt")
