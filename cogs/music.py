@@ -4,9 +4,15 @@ from discord import app_commands
 import yt_dlp
 import asyncio
 import re
+import os
 from collections import deque
 
-# yt-dlp options for extracting audio
+# ── yt-dlp options ────────────────────────────────────────────────────────────
+# Use the iOS player client to bypass YouTube's bot-detection / sign-in wall.
+# If a cookies.txt file is present (Netscape format exported from a browser),
+# it is passed automatically for extra reliability.
+_COOKIES_FILE = os.getenv("YTDLP_COOKIES_FILE", "cookies.txt")
+
 YTDLP_OPTS = {
     "format": "bestaudio/best",
     "noplaylist": False,
@@ -14,6 +20,15 @@ YTDLP_OPTS = {
     "no_warnings": True,
     "default_search": "ytsearch",
     "source_address": "0.0.0.0",
+    # ↓ KEY FIX: use the iOS innertube client — avoids the "Sign in to confirm
+    #   you're not a bot" error that appears when using the web client.
+    "extractor_args": {
+        "youtube": {
+            "player_client": ["ios", "web"],
+        }
+    },
+    # Pass browser cookies if the file exists (optional but improves reliability)
+    **({"cookiefile": _COOKIES_FILE} if os.path.isfile(_COOKIES_FILE) else {}),
     "postprocessors": [{
         "key": "FFmpegExtractAudio",
         "preferredcodec": "opus",
@@ -42,7 +57,6 @@ async def extract_info(query: str, loop: asyncio.AbstractEventLoop) -> dict | No
     # Handle Spotify — convert to search query
     spotify_match = SPOTIFY_PATTERN.match(query)
     if spotify_match:
-        # We can't stream Spotify directly; search YouTube by track name instead
         track_id = spotify_match.group(2)
         query = f"ytsearch:{track_id} spotify"
 
