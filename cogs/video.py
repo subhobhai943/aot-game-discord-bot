@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections import deque
 from typing import Optional
 
@@ -105,14 +106,20 @@ class StreamState:
                 await self._play_task
             except (asyncio.CancelledError, Exception):
                 pass
+        # VideoPlayer.stop() is SYNCHRONOUS — do NOT await it
         if self.player:
             try:
-                await self.player.stop()
+                self.player.stop()
             except Exception:
                 pass
         if self.streamer:
             try:
-                await self.streamer.stop_stream()
+                # leave_voice properly disconnects; falls back to stop_stream
+                guild_id = getattr(self, "_guild_id", None)
+                if guild_id is not None:
+                    await self.streamer.leave_voice(guild_id)
+                else:
+                    await self.streamer.stop_stream()
             except Exception:
                 pass
         self.player = self.streamer = None
@@ -132,27 +139,30 @@ def get_stream_state(guild_id: int) -> StreamState:
 
 async def _resolve(query: str, loop: asyncio.AbstractEventLoop) -> tuple[str, str]:
     """
-    Returns (direct_url, display_title).
-    If the query looks like a local path or direct URL, pass it through.
-    Otherwise, resolve via yt-dlp.
+    Returns (youtube_url_or_direct, display_title).
+    We pass the YouTube URL directly to the library’s VideoPlayer —
+    the library handles its own yt-dlp resolution (with cookies) internally.
     """
-    import os
-    import yt_dlp  # available as a dependency of discord-video-stream-py
+    import yt_dlp
 
-    # Local file or direct URL — skip yt-dlp
+    # Local file or direct URL — pass through unchanged
+    direct_exts = (".mp4", ".mkv", ".webm", ".avi", ".mov", ".flv", ".ts", ".m3u8")
     is_direct = (
         os.path.exists(query)
         or query.lower().startswith(("rtmp://", "rtmps://", "rtsp://"))
+        or any(query.lower().endswith(e) for e in direct_exts)
     )
-    direct_exts = (".mp4", ".mkv", ".webm", ".avi", ".mov", ".flv", ".ts", ".m3u8")
-    is_direct = is_direct or any(query.lower().endswith(e) for e in direct_exts)
-
     if is_direct:
         title = os.path.basename(query) if os.path.exists(query) else query[:60]
         return query, title
 
-    # Prefix bare search terms with ytsearch:
-    search_query = query if query.startswith("http") else f"ytsearch:{query}"
+    # For YouTube URLs: return the URL directly (library resolves internally)
+    if query.startswith("http"):
+        # Just fetch the title using yt-dlp, but return the original URL
+        # so the library can handle format selection with cookies
+        search_query = query
+    else:
+        search_query = f"ytsearch:{query}"
 
     ydl_opts = {
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
@@ -160,10 +170,8 @@ async def _resolve(query: str, loop: asyncio.AbstractEventLoop) -> tuple[str, st
         "no_warnings": True,
         "extract_flat": False,
         "noplaylist": True,
-        "js_runtimes": {"node": {}},
     }
 
-    # Add YouTube cookie authentication
     _cookies_file = os.getenv("YTDLP_COOKIES_FILE", "cookies.txt")
     _browser = os.getenv("YTDLP_BROWSER", "")
     if os.path.isfile(_cookies_file):
@@ -178,9 +186,11 @@ async def _resolve(query: str, loop: asyncio.AbstractEventLoop) -> tuple[str, st
                 return None, None
             if "entries" in info:
                 info = info["entries"][0]
-            url   = info.get("url") or info.get("manifest_url") or query
+            # Return the original YouTube watch URL so the library re-resolves
+            # with its own format logic (combined video+audio stream)
+            original_url = info.get("webpage_url") or info.get("original_url") or query
             title = info.get("title", query[:60])
-            return url, title
+            return original_url, title
 
     return await loop.run_in_executor(None, _extract)
 
@@ -191,12 +201,12 @@ async def _resolve(query: str, loop: asyncio.AbstractEventLoop) -> tuple[str, st
 # ---------------------------------------------------------------------------
 
 class Video(commands.Cog):
-    """📹 Video streaming commands — stream video into a Discord Go Live session."""
+    """✅ Video streaming commands — stream video into a Discord Go Live session."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # ── helpers ─────────────────────────────────────────────────────────────
+    # ── helpers ───────────────────────────────────────────────────────────────────
 
     def _author_vc(self, ctx_or_interaction) -> Optional[discord.VoiceChannel]:
         is_i = isinstance(ctx_or_interaction, discord.Interaction)
@@ -215,7 +225,7 @@ class Video(commands.Cog):
         else:
             await ctx_or_interaction.send(content, embed=embed)
 
-    # ── core stream logic ───────────────────────────────────────────────────
+    # ── core stream logic ──────────────────────────────────────────────────────────
 
     async def _start_stream(
         self,
@@ -230,7 +240,7 @@ class Video(commands.Cog):
         state = get_stream_state(guild.id)
         queue = get_video_queue(guild.id)
 
-        # Resolve URL
+        # Resolve URL / title
         await self._send(ctx_or_interaction, f"🔍 Resolving: `{query}`...")
         try:
             url, title = await _resolve(query, self.bot.loop)
@@ -256,6 +266,7 @@ class Video(commands.Cog):
         # Fresh stream — join VC and start
         try:
             state.streamer = Streamer(self.bot)
+            state._guild_id = guild.id  # store for leave_voice on stop
             await state.streamer.join_voice(
                 guild_id=guild.id,
                 channel_id=vc_channel.id,
@@ -266,7 +277,6 @@ class Video(commands.Cog):
                 codec=Codec.H264,
                 stream_type=StreamType.GO_LIVE,
             )
-            state.player = VideoPlayer(url, udp)
         except Exception as exc:
             await state.stop()
             await self._send(ctx_or_interaction, f"❌ Stream setup failed: `{exc}`", ephemeral=True)
@@ -289,8 +299,9 @@ class Video(commands.Cog):
             nonlocal url, title
             try:
                 while url:
+                    # VideoPlayer takes the URL and resolves it internally via the library’s ytdlp.py
                     state.player = VideoPlayer(url, udp)
-                    await state.player.play()
+                    await state.player.play()  # blocks until this video ends
                     # Advance queue
                     url, title = queue.next()
                     if url:
@@ -312,12 +323,11 @@ class Video(commands.Cog):
 
         state._play_task = asyncio.create_task(_play_loop())
 
-    # ── prefix commands ──────────────────────────────────────────────────────
+    # ── prefix commands ──────────────────────────────────────────────────────────────
 
     @commands.command(name="vplay", aliases=["stream"],
                       help="Stream a video into a voice channel (Go Live). Usage: vplay <url or search>")
     async def vplay_prefix(self, ctx: commands.Context, *, query: str):
-        """Start a video stream. Accepts YouTube URLs, search terms, or local files."""
         vc = self._author_vc(ctx)
         if not vc:
             return await ctx.send("❌ Join a voice channel first!")
@@ -339,7 +349,7 @@ class Video(commands.Cog):
         if not state.is_active():
             return await ctx.send("❌ No stream is active.")
         if state.player:
-            await state.player.stop()
+            state.player.stop()  # sync call — no await
         await ctx.send("⏭️ Skipped!")
 
     @commands.command(name="vpause", help="Pause the current video stream.")
@@ -350,7 +360,7 @@ class Video(commands.Cog):
         if state.paused:
             return await ctx.send("⚠️ Already paused.")
         try:
-            await state.player.pause()
+            state.player.pause()  # sync call — no await
             state.paused = True
             await ctx.send("⏸️ Stream paused.")
         except Exception as exc:
@@ -364,7 +374,7 @@ class Video(commands.Cog):
         if not state.paused:
             return await ctx.send("⚠️ Stream is not paused.")
         try:
-            await state.player.resume()
+            state.player.resume()  # sync call — no await
             state.paused = False
             await ctx.send("▶️ Stream resumed.")
         except Exception as exc:
@@ -387,7 +397,7 @@ class Video(commands.Cog):
             embed.description = "Queue is empty!"
         await ctx.send(embed=embed)
 
-    # ── slash commands ───────────────────────────────────────────────────────
+    # ── slash commands ──────────────────────────────────────────────────────────────
 
     @app_commands.command(name="vplay", description="Stream a video into a Discord voice channel (Go Live).")
     @app_commands.describe(query="YouTube URL, search term, or direct video URL")
@@ -415,7 +425,7 @@ class Video(commands.Cog):
         if not state.is_active():
             return await interaction.followup.send("❌ No stream is active.", ephemeral=True)
         if state.player:
-            await state.player.stop()
+            state.player.stop()  # sync call — no await
         await interaction.followup.send("⏭️ Skipped!")
 
     @app_commands.command(name="vpause", description="Pause the current video stream.")
@@ -427,7 +437,7 @@ class Video(commands.Cog):
         if state.paused:
             return await interaction.followup.send("⚠️ Already paused.", ephemeral=True)
         try:
-            await state.player.pause()
+            state.player.pause()  # sync call — no await
             state.paused = True
             await interaction.followup.send("⏸️ Stream paused.")
         except Exception as exc:
@@ -442,7 +452,7 @@ class Video(commands.Cog):
         if not state.paused:
             return await interaction.followup.send("⚠️ Stream is not paused.", ephemeral=True)
         try:
-            await state.player.resume()
+            state.player.resume()  # sync call — no await
             state.paused = False
             await interaction.followup.send("▶️ Stream resumed.")
         except Exception as exc:
