@@ -100,7 +100,8 @@ class StreamState:
 
     async def stop(self):
         self.paused = False
-        if self._play_task and not self._play_task.done():
+        current_task = asyncio.current_task()
+        if self._play_task and self._play_task != current_task and not self._play_task.done():
             self._play_task.cancel()
             try:
                 await self._play_task
