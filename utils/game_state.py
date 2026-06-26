@@ -105,6 +105,13 @@ class PlayerData:
     coins:      int = 0
     collection: dict = field(default_factory=dict)
     active_titan: str = ""
+    serum:      int = 0
+    lab_atk:    int = 0
+    lab_def:    int = 0
+    lab_spd:    int = 0
+    lab_hp:     int = 0
+    squad:      Optional[str] = None
+    regiment:   str = "Cadet Corps"
 
     @property
     def xp_needed(self) -> int:
@@ -150,6 +157,13 @@ class PlayerData:
             "coins": self.coins,
             "active_titan": self.active_titan,
             "collection": self.collection,
+            "serum": self.serum,
+            "lab_atk": self.lab_atk,
+            "lab_def": self.lab_def,
+            "lab_spd": self.lab_spd,
+            "lab_hp": self.lab_hp,
+            "squad": self.squad,
+            "regiment": self.regiment,
         }
 
     @classmethod
@@ -158,6 +172,13 @@ class PlayerData:
         d.setdefault("coins", 0)
         d.setdefault("collection", {})
         d.setdefault("active_titan", "")
+        d.setdefault("serum", 0)
+        d.setdefault("lab_atk", 0)
+        d.setdefault("lab_def", 0)
+        d.setdefault("lab_spd", 0)
+        d.setdefault("lab_hp", 0)
+        d.setdefault("squad", None)
+        d.setdefault("regiment", "Cadet Corps")
         return cls(**{k: v for k, v in d.items() if k != "collection"},
                    collection=d["collection"])
 
@@ -208,8 +229,14 @@ class GameState:
         if _DB_AVAILABLE:
             d = await Database.get_player(user_id, username)
             p = PlayerData.from_dict(d)
+            p.squad_level = 0
+            if p.squad:
+                sq = await Database.get_squad(p.squad)
+                if sq:
+                    p.squad_level = sq["level"]
         else:
             p = PlayerData(user_id=user_id, username=username)
+            p.squad_level = 0
         cls._players[user_id] = p
         return p
 
@@ -248,6 +275,21 @@ class GameState:
             "Bertholdt Hoover": 280, "Hange Zoe": 260, "Armin Arlert": 240,
         }
         s_hp = scout_hp_map.get(scout_name, 280)
+
+        # Apply Lab HP upgrade: +10% HP per level
+        player = cls._players.get(player_id)
+        if player:
+            hp_level = getattr(player, "lab_hp", 0)
+            if hp_level > 0:
+                s_hp = int(s_hp * (1.0 + hp_level * 0.10))
+            # Apply Squad Level 5 HP boost (+10% HP)
+            sq_level = getattr(player, "squad_level", 0)
+            if sq_level >= 5:
+                s_hp = int(s_hp * 1.10)
+            # Apply Garrison HP boost (+20% HP)
+            if getattr(player, "regiment", "") == "Garrison":
+                s_hp = int(s_hp * 1.20)
+
         session = BattleSession(
             player_id=player_id, scout_name=scout_name, titan_name=titan_name,
             scout_hp=s_hp, scout_max_hp=s_hp, titan_hp=t["hp"], titan_max_hp=t["hp"],

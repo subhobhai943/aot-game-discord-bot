@@ -38,7 +38,14 @@ def _init_db(conn: sqlite3.Connection) -> None:
             losses      INTEGER NOT NULL DEFAULT 0,
             kills       INTEGER NOT NULL DEFAULT 0,
             coins       INTEGER NOT NULL DEFAULT 0,
-            active_titan TEXT NOT NULL DEFAULT ''
+            active_titan TEXT NOT NULL DEFAULT '',
+            serum       INTEGER NOT NULL DEFAULT 0,
+            lab_atk     INTEGER NOT NULL DEFAULT 0,
+            lab_def     INTEGER NOT NULL DEFAULT 0,
+            lab_spd     INTEGER NOT NULL DEFAULT 0,
+            lab_hp      INTEGER NOT NULL DEFAULT 0,
+            squad       TEXT,
+            regiment    TEXT NOT NULL DEFAULT 'Cadet Corps'
         );
 
         CREATE TABLE IF NOT EXISTS player_titans (
@@ -54,7 +61,28 @@ def _init_db(conn: sqlite3.Connection) -> None:
             prefix         TEXT NOT NULL DEFAULT '>',
             spawn_channel  INTEGER
         );
+
+        CREATE TABLE IF NOT EXISTS squads (
+            name          TEXT PRIMARY KEY,
+            creator_id    TEXT NOT NULL,
+            level         INTEGER NOT NULL DEFAULT 1,
+            coins_donated INTEGER NOT NULL DEFAULT 0
+        );
     """)
+    # Run column addition dynamically for existing databases
+    for col in ["serum", "lab_atk", "lab_def", "lab_spd", "lab_hp"]:
+        try:
+            conn.execute(f"ALTER TABLE players ADD COLUMN {col} INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+    try:
+        conn.execute("ALTER TABLE players ADD COLUMN squad TEXT")
+    except sqlite3.OperationalError:
+        pass
+    try:
+        conn.execute("ALTER TABLE players ADD COLUMN regiment TEXT NOT NULL DEFAULT 'Cadet Corps'")
+    except sqlite3.OperationalError:
+        pass
     conn.commit()
 
 
@@ -156,9 +184,11 @@ class Database:
             conn.execute(
                 """
                 INSERT INTO players
-                    (user_id, username, scout_name, level, xp, wins, losses, kills, coins, active_titan)
+                    (user_id, username, scout_name, level, xp, wins, losses, kills, coins, active_titan,
+                     serum, lab_atk, lab_def, lab_spd, lab_hp, squad, regiment)
                 VALUES
-                    (:user_id, :username, :scout_name, :level, :xp, :wins, :losses, :kills, :coins, :active_titan)
+                    (:user_id, :username, :scout_name, :level, :xp, :wins, :losses, :kills, :coins, :active_titan,
+                     :serum, :lab_atk, :lab_def, :lab_spd, :lab_hp, :squad, :regiment)
                 ON CONFLICT(user_id) DO UPDATE SET
                     username     = excluded.username,
                     scout_name   = excluded.scout_name,
@@ -168,7 +198,14 @@ class Database:
                     losses       = excluded.losses,
                     kills        = excluded.kills,
                     coins        = excluded.coins,
-                    active_titan = excluded.active_titan
+                    active_titan = excluded.active_titan,
+                    serum        = excluded.serum,
+                    lab_atk      = excluded.lab_atk,
+                    lab_def      = excluded.lab_def,
+                    lab_spd      = excluded.lab_spd,
+                    lab_hp       = excluded.lab_hp,
+                    squad        = excluded.squad,
+                    regiment     = excluded.regiment
                 """,
                 player_data
             )
@@ -200,3 +237,48 @@ class Database:
                 result.append(d)
             return result
         return await cls._run(_q, cls._conn)
+
+    # ── Squad queries ───────────────────────────────────────────────────────
+    @classmethod
+    async def get_squad(cls, name: str) -> Optional[dict]:
+        def _q(conn):
+            row = conn.execute(
+                "SELECT * FROM squads WHERE name = ?",
+                (name,)
+            ).fetchone()
+            return dict(row) if row else None
+        return await cls._run(_q, cls._conn)
+
+    @classmethod
+    async def save_squad(cls, squad_data: dict) -> None:
+        def _q(conn):
+            conn.execute(
+                """
+                INSERT INTO squads (name, creator_id, level, coins_donated)
+                VALUES (:name, :creator_id, :level, :coins_donated)
+                ON CONFLICT(name) DO UPDATE SET
+                    level         = excluded.level,
+                    coins_donated = excluded.coins_donated
+                """,
+                squad_data
+            )
+            conn.commit()
+        await cls._run(_q, cls._conn)
+
+    @classmethod
+    async def get_squad_members(cls, name: str) -> list[dict]:
+        def _q(conn):
+            rows = conn.execute(
+                "SELECT user_id, username, level, wins, coins FROM players WHERE squad = ?",
+                (name,)
+            ).fetchall()
+            return [dict(r) for r in rows]
+        return await cls._run(_q, cls._conn)
+
+    @classmethod
+    async def delete_squad(cls, name: str) -> None:
+        def _q(conn):
+            conn.execute("DELETE FROM squads WHERE name = ?", (name,))
+            conn.execute("UPDATE players SET squad = NULL WHERE squad = ?", (name,))
+            conn.commit()
+        await cls._run(_q, cls._conn)

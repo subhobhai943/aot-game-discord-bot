@@ -6,7 +6,9 @@ FIX: Removed all local asset image references — uses external CDN URLs from ga
 from __future__ import annotations
 import asyncio
 import random
+import logging
 import discord
+from discord import app_commands
 from discord.ext import commands, tasks
 from utils.game_state import (
     GameState, TITAN_STATS, TITAN_WEIGHTS, get_titan_image, attach_image,
@@ -137,18 +139,21 @@ class TitanCatch(commands.Cog):
         import time
         now = time.time()
         for guild in self.bot.guilds:
-            channel_id = await GameState.get_spawn_channel(guild.id)
-            if not channel_id:
-                continue
-            if now < self._next_spawn.get(guild.id, 0):
-                continue
-            if guild.id in _active_spawns:
-                continue
-            channel = guild.get_channel(channel_id)
-            if not channel:
-                continue
-            await self._do_spawn(guild.id, channel)
-            self._next_spawn[guild.id] = now + random.randint(*SPAWN_INTERVAL)
+            try:
+                channel_id = await GameState.get_spawn_channel(guild.id)
+                if not channel_id:
+                    continue
+                if now < self._next_spawn.get(guild.id, 0):
+                    continue
+                if guild.id in _active_spawns:
+                    continue
+                channel = guild.get_channel(channel_id)
+                if not channel:
+                    continue
+                await self._do_spawn(guild.id, channel)
+                self._next_spawn[guild.id] = now + random.randint(*SPAWN_INTERVAL)
+            except Exception as e:
+                logging.error(f"[Spawn] Error in auto_spawn loop for guild {guild.id}: {e}", exc_info=e)
 
     @auto_spawn.before_loop
     async def before_spawn(self):
@@ -159,7 +164,10 @@ class TitanCatch(commands.Cog):
         titan = _spawn_weights()
         embed, file = _spawn_embed(titan)
         view  = CatchView(guild_id, titan, channel)
-        msg   = await channel.send(embed=embed, view=view, file=file)
+        if file:
+            msg   = await channel.send(embed=embed, view=view, file=file)
+        else:
+            msg   = await channel.send(embed=embed, view=view)
         _active_spawns[guild_id] = {"titan": titan, "message_id": msg.id, "caught": False}
 
     # ── >setspawn ──────────────────────────────────────────────────────────
@@ -175,7 +183,10 @@ class TitanCatch(commands.Cog):
             color=0x55AA55
         )
         file = attach_image(embed, SURVEY_CORPS_ICON, as_thumbnail=True)
-        await ctx.send(embed=embed, file=file)
+        if file:
+            await ctx.send(embed=embed, file=file)
+        else:
+            await ctx.send(embed=embed)
 
     # ── >spawn (manual, admin) ─────────────────────────────────────────────
     @commands.command(name="spawn")
@@ -186,6 +197,35 @@ class TitanCatch(commands.Cog):
             await ctx.send("⚠️ A titan is already active! Wait for it to be caught or to escape.")
             return
         await self._do_spawn(ctx.guild.id, ctx.channel)
+
+    # ── /setspawn (slash, admin) ──
+    @app_commands.command(name="setspawn", description="Set the channel where Titans will randomly spawn")
+    @app_commands.describe(channel="The text channel for Titan spawns")
+    @app_commands.default_permissions(manage_guild=True)
+    async def setspawn_slash(self, interaction: discord.Interaction, channel: discord.TextChannel = None):
+        ch = channel or interaction.channel
+        await GameState.set_spawn_channel(interaction.guild_id, ch.id)
+        embed = discord.Embed(
+            title="✅ Spawn Channel Set",
+            description=f"Titans will now randomly spawn in {ch.mention}!",
+            color=0x55AA55
+        )
+        file = attach_image(embed, SURVEY_CORPS_ICON, as_thumbnail=True)
+        if file:
+            await interaction.response.send_message(embed=embed, file=file)
+        else:
+            await interaction.response.send_message(embed=embed)
+
+    # ── /spawn (slash, admin) ──
+    @app_commands.command(name="spawn", description="Manually force a Titan to spawn in the current channel")
+    @app_commands.default_permissions(manage_guild=True)
+    async def spawn_slash(self, interaction: discord.Interaction):
+        if interaction.guild_id in _active_spawns:
+            await interaction.response.send_message("⚠️ A titan is already active! Wait for it to be caught or to escape.", ephemeral=True)
+            return
+        await interaction.response.defer()
+        await self._do_spawn(interaction.guild_id, interaction.channel)
+        await interaction.followup.send("👹 A Titan has been summoned!")
 
     # ── >collection ────────────────────────────────────────────────────────
     @commands.command(name="collection", aliases=["col", "titans"])

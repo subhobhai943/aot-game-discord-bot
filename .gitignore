@@ -13,3 +13,9 @@ data/player_data.json
 Dockerfile
 mcp_client.py
 mcp_resoponse.json
+.cache/
+.cache
+.env.save
+.gemini/
+cookies.txt
+scratch/

@@ -1,6 +1,8 @@
 """Server settings: custom prefix management."""
 import json
 import os
+import time
+import psutil
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -81,6 +83,92 @@ class Settings(commands.Cog):
             color=discord.Color.blurple(),
         )
         embed.set_footer(text="Use /set_prefix to change it (requires Manage Server permission).")
+        await interaction.response.send_message(embed=embed)
+
+    def _get_resources_embed(self) -> discord.Embed:
+        # CPU
+        cpu_percent = psutil.cpu_percent(interval=None)
+        cpu_count = psutil.cpu_count()
+        
+        # Memory
+        mem = psutil.virtual_memory()
+        mem_total_gb = mem.total / (1024 ** 3)
+        mem_used_gb = mem.used / (1024 ** 3)
+        mem_percent = mem.percent
+        
+        # Disk
+        disk = psutil.disk_usage('/')
+        disk_total_gb = disk.total / (1024 ** 3)
+        disk_used_gb = disk.used / (1024 ** 3)
+        disk_percent = disk.percent
+        
+        # Uptime
+        boot_time = psutil.boot_time()
+        uptime_sec = time.time() - boot_time
+        days, rem = divmod(int(uptime_sec), 86400)
+        hours, rem = divmod(rem, 3600)
+        minutes, seconds = divmod(rem, 60)
+        uptime_str = f"{days}d {hours}h {minutes}m" if days else f"{hours}h {minutes}m"
+        
+        # Process (Bot)
+        proc = psutil.Process()
+        bot_mem_mb = proc.memory_info().rss / (1024 ** 2)
+        
+        # Gateway latency
+        latency_ms = round(self.bot.latency * 1000)
+        
+        def progress_bar(percent: float, size: int = 12) -> str:
+            filled = min(size, max(0, round(percent / 100 * size)))
+            return f"`{'█' * filled}{'░' * (size - filled)}` {percent:.1f}%"
+            
+        embed = discord.Embed(
+            title="🖥️ Server Resources & Load Status",
+            color=discord.Color.dark_theme() if cpu_percent < 80 else discord.Color.red(),
+        )
+        
+        embed.add_field(
+            name="💻 CPU Load",
+            value=f"{progress_bar(cpu_percent)}\n*{cpu_count} Cores / Threads*",
+            inline=True
+        )
+        embed.add_field(
+            name="💾 System RAM",
+            value=f"{progress_bar(mem_percent)}\n*{mem_used_gb:.2f} GB / {mem_total_gb:.2f} GB*",
+            inline=True
+        )
+        embed.add_field(
+            name="💽 Disk Storage",
+            value=f"{progress_bar(disk_percent)}\n*{disk_used_gb:.1f} GB / {disk_total_gb:.1f} GB*",
+            inline=True
+        )
+        
+        embed.add_field(
+            name="🤖 Bot RAM Usage",
+            value=f"`{bot_mem_mb:.1f} MB`",
+            inline=True
+        )
+        embed.add_field(
+            name="⚡ API Latency",
+            value=f"`{latency_ms} ms`",
+            inline=True
+        )
+        embed.add_field(
+            name="⏱️ System Uptime",
+            value=f"`{uptime_str}`",
+            inline=True
+        )
+        
+        embed.set_footer(text="AoT Game Bot  •  Auto-updated on request")
+        return embed
+
+    @commands.command(name="resources", help="Check the current server usage and load.")
+    async def resources_prefix(self, ctx: commands.Context):
+        embed = self._get_resources_embed()
+        await ctx.send(embed=embed)
+
+    @app_commands.command(name="resources", description="Check the current server usage and load")
+    async def resources_slash(self, interaction: discord.Interaction):
+        embed = self._get_resources_embed()
         await interaction.response.send_message(embed=embed)
 
 

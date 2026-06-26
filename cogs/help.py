@@ -18,6 +18,7 @@ CATEGORIES = [
             ("Aot slash / odmdash",       "Attack moves during PvE battle"),
             ("Aot battle @user",          "Challenge another player to a PvP duel"),
             ("/simulate <char> <titan>",  "Cinematic battle simulation (slash command)"),
+            ("/raid  |  >raid",           "Start a multiplayer co-op PvE Titan Raid"),
         ],
     },
     {
@@ -64,6 +65,7 @@ CATEGORIES = [
             ("/odm-training",     "Test your ODM gear skill"),
             ("/daily-challenge",  "Daily AoT challenge for XP"),
             ("/aot-fact",         "Random Attack on Titan fact"),
+            ("/titan3d | >titan3d", "Play a 3D first-person Titan Hunt maze game!"),
         ],
     },
     {
@@ -93,8 +95,40 @@ CATEGORIES = [
         "fields": [
             ("/profile [@user]",     "View your profile card + Discord PFP"),
             ("/choose-scout <name>", "Choose your scout character"),
+            ("/shop  |  >shop",      "Regiment supplies and Titan recruitment shop"),
             ("Aot leaderboard",      "Server rankings: wins · level · titans · coins"),
             ("Aot myrank [@user]",   "Check your rank across all categories"),
+        ],
+    },
+    {
+        "id": "squad",
+        "label": "🛡️ Squads",
+        "emoji": "🛡️",
+        "color": 0x2E86C1,
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
+        "desc": "Survey Corps Vanguard Squads — team up, donate coins, and unlock global regiment boosts.",
+        "fields": [
+            ("/squad-create <name> |  >squad create", "Create a new squad (Costs 500 coins)"),
+            ("/squad-join <name>   |  >squad join",   "Join an existing vanguard squad"),
+            ("/squad-info [name]   |  >squad info",   "View squad stats and active buffs"),
+            ("/squad-donate <amt>  |  >squad donate", "Donate coins to upgrade level & unlock buffs"),
+            ("/squad-leave         |  >squad leave",  "Leave squad (disbands if creator)"),
+        ],
+    },
+    {
+        "id": "regiment",
+        "label": "🎖️ Regiments",
+        "emoji": "🎖️",
+        "color": 0x34495E,
+        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
+        "desc": "Military Regiments — Join a branch (Survey Corps, Garrison, Military Police) to gain combat stat buffs and roles.",
+        "fields": [
+            ("/regiment-join <choice>|  >regiment join", "Enlist in a regiment (Free first time, 500 coins transfer)"),
+            ("/regiment-info [user]  |  >regiment info", "View military record, upgrades, and active buffs"),
+            ("/regiment-list         |  >regiment list", "List branches, buffs, and soldier counts"),
+            ("/regiment-setup-gate   |  >regiment setupgate", "[Admin] Dispatch the visual onboarding gates panel"),
+            ("/regiment-link-role    |  >regiment linkrole", "[Admin] Link a regiment to a Discord role"),
+            ("/regiment-set-channels |  >regiment setchannel", "[Admin] Configure welcome alerts and gate channels"),
         ],
     },
     {
@@ -107,6 +141,8 @@ CATEGORIES = [
         "fields": [
             ("/ability",           "Use your scout's signature ability"),
             ("/transform <titan>", "Transform into a Titan"),
+            ("/melt <titan>  |  >melt <titan>",   "Recycle a duplicate Titan into Shifter Serum"),
+            ("/laboratory   |  >laboratory",      "Open the Shifter Serum upgrade laboratory"),
             ("/gear-upgrade",      "View & upgrade your ODM gear"),
             ("/scout-ranking",     "Top 10 Scouts leaderboard"),
         ],
@@ -159,6 +195,16 @@ CATEGORIES = [
         "desc": "Stream music into a voice channel from YouTube, Spotify names, or any direct URL.",
         "fields": [
             ("/play <query>  |  >p <query>",     "Join VC and play a song (YouTube / Spotify name / URL)"),
+            ("/mood-music <mood> | @bot play...", "AI finds & plays music matching your mood/request"),
+            ("/loop          |  >loop",           "Toggle loop mode: off ➔ song ➔ queue"),
+            ("/aot           |  >aot",            "Play the complete Attack on Titan playlist"),
+            ("/deathnote     |  >deathnote",      "Play the complete Death Note playlist"),
+            ("/naruto        |  >naruto",         "Play the complete Naruto playlist"),
+            ("/demonslayer   |  >demonslayer",    "Play the complete Demon Slayer playlist"),
+            ("/berserk       |  >berserk",        "Play the complete Berserk playlist"),
+            ("/vinlandsaga   |  >vinlandsaga",    "Play the complete Vinland Saga playlist"),
+            ("/tokyorevengers |  >tokyorevengers","Play the complete Tokyo Revengers playlist"),
+            ("/jujutsukaisen |  >jujutsukaisen",  "Play the complete Jujutsu Kaisen playlist"),
             ("/skip          |  >skip",           "Skip the current song and play the next in queue"),
             ("/pause         |  >pause",          "Pause playback"),
             ("/resume        |  >resume",         "Resume a paused track"),
@@ -167,23 +213,7 @@ CATEGORIES = [
             ("Tip", "You must be in a voice channel to use music commands."),
         ],
     },
-    {
-        "id": "video",
-        "label": "📹 Video",
-        "emoji": "📹",
-        "color": 0xFF0000,
-        "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
-        "desc": "Stream video directly into a Discord voice channel via Go Live (720p · 30 fps · H.264). Powered by discord-video-stream-py.",
-        "fields": [
-            ("/vplay <query>  |  >vplay <query>",  "Join VC, start Go Live, and stream a video (YouTube / URL / search term)"),
-            ("/vskip         |  >vskip",           "Skip the current video and play the next in queue"),
-            ("/vpause        |  >vpause",          "Pause the video stream"),
-            ("/vresume       |  >vresume",         "Resume a paused video stream"),
-            ("/vstop         |  >vstop",           "Stop the stream, clear queue, and disconnect"),
-            ("/vqueue        |  >vqueue / >vq",    "Show the current video queue"),
-            ("Tip", "The bot account must have Go Live permission in the server. Bare search terms are auto-resolved via yt-dlp."),
-        ],
-    },
+
     {
         "id": "moderation",
         "label": "🛡️ Moderation",
@@ -192,6 +222,11 @@ CATEGORIES = [
         "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
         "desc": "Server moderation, AFK management, and AutoMod configuration.",
         "fields": [
+            ("/purge [amount] | >purge [amount]", "Purge messages from this channel (moderator only)"),
+            ("/warn <member> [reason]",  "Warn a server member (moderator only)"),
+            ("/mute <member> [mins]",    "Timeout a member (moderator only)"),
+            ("/warnings [member]",       "Check warning count for a member"),
+            ("/clearwarnings <member>",  "Clear all warnings for a member (Admin only)"),
             ("Aot afk [message]",        "Set yourself AFK with an AoT-themed message"),
             ("Aot afklist",              "List all currently AFK soldiers"),
             ("Aot automod",              "View AutoMod settings"),
@@ -201,14 +236,25 @@ CATEGORIES = [
     },
     {
         "id": "settings",
-        "label": "⚙️ Settings",
+        "label": "⚙️ Utility & Settings",
         "emoji": "⚙️",
         "color": 0x7F8C8D,
         "thumbnail": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/Attack_on_Titan_logo.png/640px-Attack_on_Titan_logo.png",
-        "desc": "Server and bot configuration (some require Manage Server).",
+        "desc": "Server utility tools, interactive polls, and bot settings.",
         "fields": [
             ("/set-prefix <prefix>", "Set a custom command prefix for this server"),
             ("/prefix",              "Check the current server prefix"),
+            ("/ping          |  >ping",           "Check the bot's response time and API latency"),
+            ("/serverinfo    |  >serverinfo",     "Get detailed statistics about this server"),
+            ("/userinfo      |  >userinfo [@user]","Get details about a server member"),
+            ("/avatar        |  >avatar [@user]",  "Get a user's high-resolution avatar picture"),
+            ("/poll          |  >poll <q> <opts>","Create an interactive multiple-choice poll"),
+            ("/snipe [index] |  >snipe [index]",  "Snipe a recently deleted message (1-10)"),
+            ("/snipelist     |  >snipelist",      "List the last 10 deleted messages in this channel"),
+            ("/resources     |  >resources",       "Check the current server resource usage and load"),
+            ("/provider <choice> |  >provider <choice>", "Switch the active AI provider (Gemini or NVIDIA NIM)"),
+            ("/models [model]    |  >models [model]",    "Choose or view the active NVIDIA NIM model"),
+            ("/aimode <choice>   |  >aimode <choice>",   "Switch AI assistant mood (Captain, Friendly, Funny, Anime)"),
             ("Aot colors",           "Change your name color role"),
             ("Aot lookup <number>",  "Look up a phone number"),
         ],
@@ -284,7 +330,7 @@ class HelpDropdown(discord.ui.Select):
 
 class HelpView(discord.ui.View):
     # Row 1: 5 pinned quick-access category buttons
-    QUICK = ["battle", "titans", "reactions", "music", "video"]
+    QUICK = ["battle", "titans", "reactions", "music", "games"]
 
     def __init__(self, current: str = "overview", author_id: int = 0):
         super().__init__(timeout=180)
@@ -307,7 +353,7 @@ class HelpView(discord.ui.View):
                                 row=0))
         self.add_item(NavButton("▶", next_id, discord.ButtonStyle.secondary, row=0))
 
-        # Row 1: 5 quick-access category buttons (battle / titans / reactions / music / video)
+        # Row 1: 5 quick-access category buttons (battle / titans / reactions / music / games)
         for cat_id in self.QUICK:
             cat = CAT_MAP[cat_id]
             style = discord.ButtonStyle.primary if self.current == cat_id else discord.ButtonStyle.secondary

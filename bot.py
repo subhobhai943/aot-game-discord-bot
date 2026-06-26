@@ -60,7 +60,6 @@ COGS = [
     "cogs.afk",
     "cogs.automod",
     "cogs.music",
-    "cogs.video",       # discord-video-stream-py Go Live streaming
     "cogs.colors",
     "cogs.lookup",
     "cogs.activate_rumbling",
@@ -69,6 +68,15 @@ COGS = [
     "cogs.leaderboard",
     "cogs.titan_game",
     "cogs.among_titans",
+    "cogs.shop",
+    "cogs.raid",
+    "cogs.utility",
+    "cogs.laboratory",
+    "cogs.snipe",
+    "cogs.squad",
+    "cogs.regiments",
+    "cogs.games3d",
+    "cogs.platformer",
 ]
 
 
@@ -130,13 +138,17 @@ class AoTBot(commands.Bot):
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandNotFound):
             return
+        if isinstance(error, commands.MissingPermissions):
+            await ctx.send(f"❌ You do not have permission to use this command. Required: `{', '.join(error.missing_permissions)}`.")
+            return
         if isinstance(error, commands.MissingRequiredArgument):
-            await ctx.send(f"\u274c Missing argument: `{error.param.name}`")
+            await ctx.send(f"❌ Missing argument: `{error.param.name}`")
             return
         if isinstance(error, commands.BadArgument):
-            await ctx.send(f"\u274c Bad argument. Did you mention a valid user?")
+            await ctx.send(f"❌ Invalid argument provided. Please check the command usage.")
             return
-        raise error
+        logging.error(f"Command error in {ctx.command}: {error}", exc_info=error)
+        await ctx.send(f"❌ An error occurred while executing the command.")
 
 
 def main():

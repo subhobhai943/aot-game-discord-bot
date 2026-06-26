@@ -143,7 +143,7 @@ class LiveBattle:
         "channel_id", "message_id",
     )
 
-    def __init__(self, user_id: str, username: str, scout_name: str, titan_name: str):
+    def __init__(self, user_id: str, username: str, scout_name: str, titan_name: str, player=None):
         t = TITAN_STATS.get(titan_name, {"hp": 300})
         scout_hp_map = {
             "Levi Ackerman": 320, "Mikasa Ackerman": 300, "Erwin Smith": 280,
@@ -154,8 +154,20 @@ class LiveBattle:
         self.username      = username
         self.scout_name    = scout_name
         self.titan_name    = titan_name
-        self.scout_hp      = scout_hp_map.get(scout_name, 280)
-        self.scout_max_hp  = self.scout_hp
+        s_hp = scout_hp_map.get(scout_name, 280)
+        
+        if player:
+            hp_level = getattr(player, "lab_hp", 0)
+            if hp_level > 0:
+                s_hp = int(s_hp * (1.0 + hp_level * 0.10))
+            sq_level = getattr(player, "squad_level", 0)
+            if sq_level >= 5:
+                s_hp = int(s_hp * 1.10)
+            if getattr(player, "regiment", "") == "Garrison":
+                s_hp = int(s_hp * 1.20)
+
+        self.scout_hp      = s_hp
+        self.scout_max_hp  = s_hp
         self.titan_hp      = t["hp"]
         self.titan_max_hp  = t["hp"]
         self.round_num     = 1
@@ -396,7 +408,8 @@ class Battle(commands.Cog):
     async def _start_battle(
         self, send_fn, uid: str, username: str, character: str, titan: str
     ):
-        battle  = LiveBattle(uid, username, character, titan)
+        player = await GameState.get_player(uid, username)
+        battle  = LiveBattle(uid, username, character, titan, player=player)
         _BATTLES[uid] = battle
 
         gif_url = await get_gif("salute")
@@ -469,6 +482,17 @@ class Battle(commands.Cog):
                 else:
                     lo, hi = meta["dmg"]
                     dmg = random.randint(lo, hi)
+                    player = await GameState.get_player(battle.user_id, interaction.user.display_name)
+                    # Apply lab ATK boost: +5% damage per level
+                    if getattr(player, "lab_atk", 0) > 0:
+                        dmg = int(dmg * (1.0 + player.lab_atk * 0.05))
+                    # Apply Squad Level 4 ATK boost (+5% damage)
+                    if getattr(player, "squad_level", 0) >= 4:
+                        dmg = int(dmg * 1.05)
+                    # Apply Survey Corps ATK boost (+15% damage)
+                    if getattr(player, "regiment", "") == "Survey Corps":
+                        dmg = int(dmg * 1.15)
+
                     if battle.scout_status == "RAGE":
                         dmg = int(dmg * 1.3)
                         log.append("\U0001f7e5 **RAGE ACTIVE!** +30% damage!")
@@ -515,6 +539,14 @@ class Battle(commands.Cog):
             log.append(f"\u26a1 **{battle.titan_name}** is stunned! Skipped its attack.")
         else:
             t_dmg, t_missed, t_desc = titan_ai_move()
+            player = await GameState.get_player(battle.user_id, interaction.user.display_name)
+            # Speed dodge (5% chance per speed upgrade level)
+            import random
+            dodge_chance = getattr(player, "lab_spd", 0) * 0.05
+            if not t_missed and random.random() < dodge_chance:
+                t_missed = True
+                t_desc = "swipes but you swift-dodge it with your upgraded ODM thrusters!"
+
             if battle.scout_status == "SHIELD":
                 battle.scout_status = None
                 log.append("\U0001f6e1\ufe0f **SHIELD BLOCKED** the titan's attack! No damage taken.")
@@ -523,6 +555,10 @@ class Battle(commands.Cog):
             elif t_missed:
                 log.append(f"\U0001f4a8 {battle.titan_name} {t_desc} \u2014 **MISSED!**")
             else:
+                # Apply lab DEF: reduce damage by 5% per level (down to min of 1)
+                def_level = getattr(player, "lab_def", 0)
+                if def_level > 0:
+                    t_dmg = max(1, int(t_dmg * (1.0 - def_level * 0.05)))
                 battle.scout_hp = max(0, battle.scout_hp - t_dmg)
                 hit_line = random.choice(TITAN_HIT_LINES)
                 log.append(
@@ -555,6 +591,20 @@ class Battle(commands.Cog):
         t_stats = TITAN_STATS.get(battle.titan_name, {"hp": 200, "rarity": "Common"})
         xp_gain = t_stats.get("hp", 200) // 4 + battle.combo * 5
         coins   = 25 + (10 if t_stats.get("rarity") in ("Epic", "Legendary") else 0)
+
+        # Apply Squad level 2 XP boost (+10% XP) and level 3 Coins boost (+10% Coins)
+        sq_level = getattr(player, "squad_level", 0)
+        if sq_level >= 2:
+            xp_gain = int(xp_gain * 1.10)
+        if sq_level >= 3:
+            coins = int(coins * 1.10)
+
+        # Apply Regiment boosts
+        if getattr(player, "regiment", "") == "Cadet Corps":
+            xp_gain = int(xp_gain * 1.25)
+        elif getattr(player, "regiment", "") == "Military Police":
+            coins = int(coins * 1.20)
+
         levelled = player.add_xp(xp_gain)
         player.coins += coins
         player.kills += 1

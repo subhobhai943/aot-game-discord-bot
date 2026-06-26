@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/bot_logo.jpg" alt="ODM Striker Logo" width="200" height="200" style="border-radius: 20%; margin-bottom: 20px;" />
+
 # 🪽 AoT Game Discord Bot
 
 **A full-featured Attack on Titan Discord game bot**  

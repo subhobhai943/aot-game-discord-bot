@@ -121,10 +121,23 @@ class MoveView(discord.ui.View):
                 f"\U0001f6e1\ufe0f **{session.scout_name}** defends and recovers **{heal} HP**!"
             )
         else:
+            player = await GameState.get_player(self.player_id, interaction.user.display_name)
             dmg, missed, desc = calc_move(move_key, attacker_is_scout=True)
             if missed:
                 log_lines.append(f"\U0001f4a8 **{session.scout_name}** {desc} **(MISS!)**")
             else:
+                # Apply lab ATK boost: +5% damage per level
+                atk_level = getattr(player, "lab_atk", 0)
+                if atk_level > 0:
+                    dmg = int(dmg * (1.0 + atk_level * 0.05))
+                # Apply Squad Level 4 ATK boost (+5% damage)
+                sq_level = getattr(player, "squad_level", 0)
+                if sq_level >= 4:
+                    dmg = int(dmg * 1.05)
+                # Apply Survey Corps ATK boost (+15% damage)
+                if getattr(player, "regiment", "") == "Survey Corps":
+                    dmg = int(dmg * 1.15)
+
                 session.titan_hp = max(0, session.titan_hp - dmg)
                 log_lines.append(
                     f"\u2694\ufe0f **{session.scout_name}** {desc} "
@@ -140,7 +153,17 @@ class MoveView(discord.ui.View):
             )
             player.wins += 1
             player.kills += 1
-            levelled = player.add_xp(80)
+            
+            xp_gain = 80
+            # Apply Squad level 2 XP boost (+10% XP)
+            sq_level = getattr(player, "squad_level", 0)
+            if sq_level >= 2:
+                xp_gain = int(xp_gain * 1.10)
+            # Apply Cadet Corps XP boost (+25% XP)
+            if getattr(player, "regiment", "") == "Cadet Corps":
+                xp_gain = int(xp_gain * 1.25)
+                
+            levelled = player.add_xp(xp_gain)
             await GameState.save_player(player)
             GameState.end_battle(self.player_id)
 
@@ -176,11 +199,25 @@ class MoveView(discord.ui.View):
 
         # ── Titan counter-attack ─────────────────────────────────────────────
         t_dmg, t_missed, t_desc = titan_ai_move()
+        player = await GameState.get_player(self.player_id, interaction.user.display_name)
+        
+        # Check if speed dodge triggers (5% chance per level)
+        import random
+        dodge_chance = getattr(player, "lab_spd", 0) * 0.05
+        if not t_missed and random.random() < dodge_chance:
+            t_missed = True
+            t_desc = "swipes but you swift-dodge it with your upgraded ODM thrusters!"
+
         if t_missed:
             log_lines.append(
                 f"\U0001f4a8 **{session.titan_name}** {t_desc} **(MISS!)**"
             )
         else:
+            # Apply lab DEF: reduce damage by 5% per level (down to min of 1)
+            def_level = getattr(player, "lab_def", 0)
+            if def_level > 0:
+                t_dmg = max(1, int(t_dmg * (1.0 - def_level * 0.05)))
+
             session.scout_hp = max(0, session.scout_hp - t_dmg)
             log_lines.append(
                 f"\U0001f9f1 **{session.titan_name}** {t_desc} "
