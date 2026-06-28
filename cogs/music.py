@@ -8,7 +8,9 @@ import os
 import json
 import aiohttp
 import shlex
+import time
 from collections import deque
+import syncedlyrics
 
 # ── yt-dlp YouTube bot-detection bypass ───────────────────────────────────────
 #
@@ -219,12 +221,22 @@ async def extract_info(query: str, loop: asyncio.AbstractEventLoop) -> dict | No
         opts["default_search"] = "ytsearch"
 
     def _extract():
-        with yt_dlp.YoutubeDL(opts) as ydl:
+        is_playlist_url = is_url(query) and ("list=" in query or "/playlist" in query)
+        temp_opts = dict(opts)
+        if is_playlist_url:
+            temp_opts["extract_flat"] = True
+
+        with yt_dlp.YoutubeDL(temp_opts) as ydl:
             info = ydl.extract_info(query, download=False)
             if info is None:
                 return None
             if "entries" in info:
-                info = info["entries"][0]
+                is_playlist = info.get("_type") == "playlist" and is_url(query)
+                if not is_playlist:
+                    if info["entries"]:
+                        info = info["entries"][0]
+                    else:
+                        return None
             return info
 
     return await loop.run_in_executor(None, _extract)
@@ -450,9 +462,15 @@ class Music(commands.Cog):
         if not vc or not vc.is_connected():
             return
 
-        # If it is a lazy-resolved query (like Spotify tracks loaded dynamically)
-        if info.get("url") is None:
-            search_query = info.get("query")
+        # If it is a lazy-resolved query (like Spotify tracks or flat playlist entries)
+        is_unresolved = (
+            info.get("url") is None 
+            or "youtube.com/watch" in info.get("url", "") 
+            or "youtu.be/" in info.get("url", "") 
+            or info.get("http_headers") is None
+        )
+        if is_unresolved:
+            search_query = info.get("url") or info.get("query")
             try:
                 resolved_info = await extract_info(search_query, self.bot.loop)
                 if resolved_info:
@@ -617,6 +635,43 @@ class Music(commands.Cog):
 
         if not info:
             await channel.send("❌ Couldn't find anything for that query.")
+            return
+
+        # If it's a playlist:
+        if info.get("_type") == "playlist" and "entries" in info:
+            entries = list(info["entries"])
+            if not entries:
+                await channel.send("❌ Playlist is empty.")
+                return
+
+            is_first = not (vc.is_playing() or vc.is_paused() or len(queue) > 0)
+            
+            # Resolve the first song immediately if nothing is currently playing
+            if is_first:
+                first_entry = entries[0]
+                await channel.send(f"🔍 Resolving and playing first track: `{first_entry.get('title')}`...")
+                try:
+                    first_url = first_entry.get("url") or f"https://www.youtube.com/watch?v={first_entry.get('id')}"
+                    resolved = await extract_info(first_url, self.bot.loop)
+                    if resolved:
+                        first_entry.update(resolved)
+                except Exception as e:
+                    print(f"[Music] Error resolving first playlist track: {e}")
+
+            for entry in entries:
+                if not entry.get("query"):
+                    entry["query"] = entry.get("url") or f"https://www.youtube.com/watch?v={entry.get('id')}"
+                queue.add(entry)
+
+            embed = discord.Embed(
+                title="🎶 YouTube Playlist Loaded",
+                description=f"Added **{len(entries)}** tracks to the queue.",
+                color=discord.Color.green(),
+            )
+            await channel.send(embed=embed)
+
+            if is_first:
+                await self._play_next(guild, channel)
             return
 
         if vc.is_playing() or vc.is_paused() or len(queue) > 0:
@@ -924,6 +979,392 @@ class Music(commands.Cog):
         color = discord.Color.green() if latency_ms < 100 else (discord.Color.yellow() if latency_ms < 200 else discord.Color.red())
         embed = discord.Embed(title="🏓 Pong!", description=f"Bot latency: **{latency_ms}ms**", color=color)
         await interaction.response.send_message(embed=embed)
+
+    @commands.command(name="playlyrics", aliases=["lplay", "lyricsplay", "lp"], help="Play a song and print its lyrics in real-time. Usage: playlyrics <song name>")
+    async def playlyrics_prefix(self, ctx: commands.Context, *, query: str):
+        vc = await self._join_channel(ctx)
+        if not vc:
+            return
+        await self._handle_play_lyrics(ctx.guild, ctx.author, ctx.channel, query, vc)
+
+    @app_commands.command(name="playlyrics", description="Play a song and print its lyrics in real-time 🎤")
+    @app_commands.describe(query="Song title and artist name")
+    async def playlyrics_slash(self, interaction: discord.Interaction, query: str):
+        await interaction.response.defer(thinking=True)
+        vc = await self._join_channel(interaction)
+        if not vc:
+            return
+        await interaction.followup.send("🎤 Initiating song playback with real-time lyrics!", ephemeral=True)
+        await self._handle_play_lyrics(interaction.guild, interaction.user, interaction.channel, query, vc)
+
+    async def _handle_play_lyrics(self, guild, author, channel, query: str, vc: discord.VoiceClient):
+        # 1. Search/Resolve track info
+        await channel.send(f"🔍 Searching for: `{query}`...")
+        
+        # Check Spotify link
+        spotify_tracks, spotify_error = await resolve_spotify(query, self.bot.loop)
+        if spotify_error:
+            await channel.send(f"❌ {spotify_error}")
+            return
+            
+        if spotify_tracks:
+            track = spotify_tracks[0]
+            await channel.send(f"🔍 Resolving: `{track.get('title')}`...")
+            try:
+                info = await extract_info(track.get("query"), self.bot.loop)
+            except Exception as e:
+                await channel.send(f"❌ Error resolving song: `{e}`")
+                return
+        else:
+            try:
+                info = await extract_info(query, self.bot.loop)
+            except Exception as e:
+                await channel.send(f"❌ Error fetching audio: `{e}`")
+                return
+
+        if not info:
+            await channel.send("❌ Couldn't find anything for that query.")
+            return
+
+        if info.get("_type") == "playlist" and "entries" in info:
+            await channel.send("❌ Real-time lyrics are only supported for single tracks, not playlists.")
+            return
+
+        title = info.get("title", query)
+        
+        # 2. Concurrently fetch lyrics while preparing playback
+        cleaned = self._clean_title(title)
+        artist = info.get("artist") or info.get("uploader") or ""
+        if artist:
+            artist = re.sub(r"- Topic$", "", artist, flags=re.IGNORECASE).strip()
+        await channel.send(f"🔍 Searching lyrics database for: `{cleaned}`...")
+        lyrics_data = await self._fetch_lyrics(cleaned, artist)
+        
+        # 3. Add to queue normally (like play command)
+        queue = get_queue(guild.id)
+        queue.add(info)
+        
+        is_playing_already = vc.is_playing() or vc.is_paused() or len(queue.queue) > 1
+        
+        if is_playing_already:
+            embed = discord.Embed(
+                title="➕ Added to Queue (with Lyrics)",
+                description=f"**{info.get('title', 'Unknown')}** [{self._fmt_duration(info.get('duration'))}]\n"
+                            f"Position in queue: **#{len(queue.queue)}**\n"
+                            f"🎤 *Lyrics will start printing when this song plays.*",
+                color=discord.Color.blurple(),
+            )
+            await channel.send(embed=embed)
+        else:
+            await self._play_next(guild, channel)
+
+        # 4. Start background task to wait for the song to start, then run lyrics printer
+        asyncio.create_task(self._wait_and_run_lyrics(guild, channel, vc, info, lyrics_data))
+
+    async def _wait_and_run_lyrics(self, guild, channel, vc, info, lyrics_data):
+        queue = get_queue(guild.id)
+        song_id = info.get("id")
+        
+        # Wait until this song is the currently playing song
+        while vc.is_connected():
+            if queue.current and queue.current.get("id") == song_id:
+                if vc.is_playing():
+                    break
+            
+            # If the song is no longer in the queue and not current, it was removed/skipped
+            if (not queue.current or queue.current.get("id") != song_id) and all(t.get("id") != song_id for t in queue.queue):
+                return
+                
+            await asyncio.sleep(1.0)
+            
+        # Determine lyrics type and run loop
+        synced_lrc = lyrics_data.get("synced")
+        if not synced_lrc:
+            title = info.get("title", "Unknown")
+            cleaned = self._clean_title(title)
+            await channel.send(f"🪄 Database empty. Generating synced lyrics using Gemini AI for **{cleaned}**...")
+            synced_lrc = await self._fetch_synced_lyrics_from_gemini(cleaned, guild_id=guild.id)
+            if synced_lrc:
+                await channel.send(f"✅ Synced lyrics generated successfully!")
+
+        parsed_lyrics = self._parse_lrc(synced_lrc) if synced_lrc else []
+
+        if parsed_lyrics:
+            await self._run_synced_lyrics_loop(guild, channel, vc, info, parsed_lyrics)
+        else:
+            title = info.get("title", "Unknown")
+            cleaned = self._clean_title(title)
+            plain_text = lyrics_data.get("plain")
+            if not plain_text:
+                plain_text = await self._fetch_lyrics_from_gemini(cleaned, guild_id=guild.id)
+                
+            if plain_text:
+                chunks = []
+                current_chunk = ""
+                for line in plain_text.splitlines():
+                    if len(current_chunk) + len(line) + 1 > 3500:
+                        chunks.append(current_chunk)
+                        current_chunk = line
+                    else:
+                        current_chunk = (current_chunk + "\n" + line).strip()
+                if current_chunk:
+                    chunks.append(current_chunk)
+                    
+                embeds = []
+                for i, chunk in enumerate(chunks):
+                    embed = discord.Embed(
+                        title=f"🎤 Lyrics (Plain): {title}",
+                        description=chunk,
+                        color=discord.Color.blue()
+                    )
+                    if len(chunks) > 1:
+                        embed.set_footer(text=f"Page {i+1} of {len(chunks)}")
+                    embeds.append(embed)
+                    
+                await channel.send(f"ℹ️ Synced lyrics not found. Showing plain lyrics for **{title}**:")
+                for emb in embeds:
+                    await channel.send(embed=emb)
+            else:
+                await channel.send(f"⚠️ No lyrics found for: **{title}**")
+
+    def _add_lyrics_emojis(self, text: str) -> str:
+        emoji_map = {
+            "fire": "🔥", "burn": "🔥", "flame": "🔥", "hot": "🔥",
+            "rain": "🌧️", "storm": "⛈️", "thunder": "⚡", "water": "💧",
+            "tear": "😢", "cry": "😢", "sad": "😔", "blue": "💙",
+            "heart": "❤️", "love": "❤️", "kiss": "💋", "hug": "🫂",
+            "sky": "🌌", "star": "⭐", "sun": "☀️", "moon": "🌙",
+            "night": "🌃", "day": "☀️", "light": "💡", "dark": "🖤",
+            "eye": "👀", "see": "👁️", "look": "👀",
+            "boy": "👦", "girl": "👧", "man": "👨", "woman": "👩",
+            "life": "🌱", "die": "💀", "dead": "💀", "death": "💀",
+            "kill": "⚔️", "war": "⚔️", "fight": "⚔️", "sword": "⚔️",
+            "wind": "💨", "breeze": "💨", "cold": "❄️", "ice": "❄️", "snow": "❄️",
+            "run": "🏃", "walk": "🚶", "fly": "✈️", "go": "🏃",
+            "sing": "🎤", "song": "🎶", "music": "🎵", "dance": "💃",
+            "dream": "💭", "sleep": "😴", "wake": "⏰", "time": "⏰", "clock": "⏰",
+            "pain": "💔", "broken": "💔", "fear": "😨", "scared": "😨",
+            "hell": "🔥", "heaven": "👼", "angel": "👼", "god": "🙏", "pray": "🙏",
+            "smile": "😊", "laugh": "😂", "happy": "😄",
+            "gold": "🪙", "money": "💵", "rich": "🤑", "diamond": "💎",
+            "home": "🏠", "house": "🏠", "world": "🌎", "earth": "🌍",
+            "sea": "🌊", "ocean": "🌊", "wave": "🌊", "river": "🏞️",
+            "mountain": "⛰️", "tree": "🌳", "flower": "🌸", "rose": "🌹",
+            "friend": "🤝", "together": "🤝", "alone": "👤",
+            "baby": "👶", "child": "👶", "mama": "👩‍👦", "papa": "👨‍👦",
+            "brother": "👦", "sister": "👧", "king": "👑", "queen": "👑",
+            "magic": "🪄", "spell": "🪄", "truth": "🔍", "lie": "🤥",
+            "road": "🛣️", "street": "🛣️", "city": "🏙️", "town": "🏡",
+            "car": "🚗", "train": "🚂", "plane": "✈️", "boat": "⛵", "ship": "🚢",
+            "phone": "📱", "call": "📞", "ring": "💍", "door": "🚪", "key": "🔑",
+            "blood": "🩸", "wound": "🩹", "hurt": "🩹"
+        }
+        words = re.findall(r"\b\w+\b", text.lower())
+        found_emojis = []
+        for word in words:
+            matched_emoji = None
+            for key, emoji in emoji_map.items():
+                if word == key or word.startswith(key) or (key.endswith("y") and word.startswith(key[:-1])):
+                    matched_emoji = emoji
+                    break
+            if matched_emoji and matched_emoji not in found_emojis:
+                found_emojis.append(matched_emoji)
+                if len(found_emojis) >= 2:
+                    break
+        if found_emojis:
+            return f"{text} {' '.join(found_emojis)}"
+        return text
+
+    def _clean_title(self, title: str) -> str:
+        # Remove common YouTube video noise
+        title = re.sub(r"[\(\[][Oo]fficial\s+[Vv]ideo[\)\]]", "", title, flags=re.IGNORECASE)
+        title = re.sub(r"[\(\[][Oo]fficial\s+[Aa]udio[\)\]]", "", title, flags=re.IGNORECASE)
+        title = re.sub(r"[\(\[][Oo]fficial\s+[Mm]usic\s+[Vv]ideo[\)\]]", "", title, flags=re.IGNORECASE)
+        title = re.sub(r"[\(\[][Ll]yrics[\)\]]", "", title, flags=re.IGNORECASE)
+        title = re.sub(r"[\(\[][Ll]yric\s+[Vv]ideo[\)\]]", "", title, flags=re.IGNORECASE)
+        title = re.sub(r"[\(\[][Hh][Qq][\)\]]", "", title, flags=re.IGNORECASE)
+        title = re.sub(r"\b[Hh][Qq]\b", "", title, flags=re.IGNORECASE)
+        title = re.sub(r"\b[Mm]/[Vv]\b", "", title, flags=re.IGNORECASE)
+        title = re.sub(r"\b[P][V]\b", "", title, flags=re.IGNORECASE)
+        return re.sub(r"\s+", " ", title).strip()
+
+    async def _fetch_lyrics(self, title: str, artist: str = "") -> dict:
+        queries = []
+        if artist:
+            queries.append(f"{artist} - {title}")
+            queries.append(f"{title} {artist}")
+        queries.append(title)
+        
+        seen = set()
+        search_queries = []
+        for q in queries:
+            q_clean = q.strip()
+            if q_clean and q_clean not in seen:
+                seen.add(q_clean)
+                search_queries.append(q_clean)
+
+        def _search(q):
+            try:
+                lrc = syncedlyrics.search(q)
+                if lrc and len(lrc.strip()) > 30:
+                    return lrc
+            except Exception as e:
+                print(f"[Music] syncedlyrics error for '{q}': {e}")
+            return None
+
+        for query_var in search_queries:
+            lrc = await self.bot.loop.run_in_executor(None, _search, query_var)
+            if lrc:
+                return {"synced": lrc, "plain": None}
+        return {}
+
+    async def _fetch_lyrics_from_gemini(self, query: str, guild_id: int | None = None) -> str:
+        try:
+            from cogs.automod import call_gemini
+            prompt = (
+                f"Provide the complete, official lyrics for the song: '{query}'.\n"
+                f"Return ONLY the lyrics text. Do not include any intro, commentary, artist name, "
+                f"album name, year, or explanation. Just the clean lyrics, structured in verses/stanzas.\n"
+                f"If you do not know the lyrics, respond with 'Lyrics not found.'"
+            )
+            response, _ = await call_gemini(prompt, guild_id=guild_id)
+            if "lyrics not found" in response.lower() or len(response.strip()) < 20:
+                return ""
+            return response.strip()
+        except Exception as e:
+            print(f"[Music] Error fetching lyrics from Gemini: {e}")
+            return ""
+
+    async def _fetch_synced_lyrics_from_gemini(self, query: str, guild_id: int | None = None) -> str:
+        try:
+            from cogs.automod import call_gemini
+            prompt = (
+                f"Generate the synced lyrics in LRC format for the song: '{query}'.\n"
+                f"Requirements:\n"
+                f"1. Use standard LRC timestamps like [mm:ss.xx].\n"
+                f"2. Output ONLY the raw LRC format text. Do not include markdown code blocks, explanation, or extra text.\n"
+                f"3. Ensure the timestamps match the typical structure and pacing of the song.\n"
+                f"If you do not know the lyrics or timings, respond with 'Not found'."
+            )
+            response, _ = await call_gemini(prompt, guild_id=guild_id)
+            if "not found" in response.lower() or "[" not in response:
+                return ""
+            response = response.replace("```lrc", "").replace("```", "").strip()
+            return response
+        except Exception as e:
+            print(f"[Music] Error generating synced lyrics from Gemini: {e}")
+            return ""
+
+    def _parse_lrc(self, lrc_text: str) -> list[tuple[float, str]]:
+        if not lrc_text:
+            return []
+        lines = lrc_text.splitlines()
+        parsed = []
+        pattern = re.compile(r"^\[(\d+):(\d+(?:\.\d+)?)\](.*)$")
+        for line in lines:
+            line = line.strip()
+            match = pattern.match(line)
+            if match:
+                minutes = int(match.group(1))
+                seconds = float(match.group(2))
+                text = match.group(3).strip()
+                total_seconds = minutes * 60 + seconds
+                parsed.append((total_seconds, text))
+        parsed.sort(key=lambda x: x[0])
+        return parsed
+
+    async def _run_synced_lyrics_loop(self, guild, channel, vc, info, parsed_lyrics):
+        queue = get_queue(guild.id)
+        song_id = info.get("id")
+        title = info.get("title", "Unknown")
+        duration = info.get("duration", 0)
+
+        embed = discord.Embed(
+            title=f"🎤 Synced Lyrics: {title}",
+            description="🎵 *Instrumental / Intro* 🎵",
+            color=discord.Color.green()
+        )
+        lyrics_msg = await channel.send(embed=embed)
+
+        elapsed = 0.0
+        last_update = time.time()
+        last_displayed_index = -2
+        last_edit_time = 0
+
+        try:
+            while vc.is_connected() and (vc.is_playing() or vc.is_paused()):
+                if not queue.current or queue.current.get("id") != song_id:
+                    break
+
+                now = time.time()
+                if not vc.is_paused():
+                    elapsed += now - last_update
+                last_update = now
+
+                active_line_index = -1
+                for idx, (t, txt) in enumerate(parsed_lyrics):
+                    if t <= elapsed:
+                        active_line_index = idx
+                    else:
+                        break
+
+                if active_line_index != last_displayed_index:
+                    now_edit = time.time()
+                    # Throttle edits to at least 1.5 seconds to prevent rate limits
+                    is_time_to_edit = (now_edit - last_edit_time >= 1.5) or (active_line_index == -1)
+                    
+                    if is_time_to_edit:
+                        prev_line = self._add_lyrics_emojis(parsed_lyrics[active_line_index - 1][1]) if active_line_index > 0 else ""
+                        current_line = self._add_lyrics_emojis(parsed_lyrics[active_line_index][1]) if active_line_index >= 0 else "🎵 *Instrumental / Intro* 🎵"
+                        next_line = self._add_lyrics_emojis(parsed_lyrics[active_line_index + 1][1]) if active_line_index < len(parsed_lyrics) - 1 else ""
+
+                        lines = []
+                        if prev_line:
+                            lines.append(f"*{prev_line}*")
+                        else:
+                            lines.append("\u200b")
+
+                        lines.append(f"➡️ **{current_line}**")
+
+                        if next_line:
+                            lines.append(f"*{next_line}*")
+                        else:
+                            lines.append("\u200b")
+
+                        embed.description = "\n".join(lines)
+
+                        if duration > 0:
+                            pct = min(elapsed / duration, 1.0)
+                            bar_len = 15
+                            filled = int(pct * bar_len)
+                            bar = "▬" * filled + "🔘" + "▬" * (bar_len - filled - 1)
+                            if len(bar) > bar_len:
+                                bar = bar[:bar_len]
+                            current_str = self._fmt_duration(elapsed)
+                            duration_str = self._fmt_duration(duration)
+                            embed.set_footer(text=f"[{bar}] {current_str} / {duration_str}")
+                        else:
+                            embed.set_footer(text=f"Elapsed: {self._fmt_duration(elapsed)}")
+
+                        await lyrics_msg.edit(embed=embed)
+                        last_displayed_index = active_line_index
+                        last_edit_time = now_edit
+
+                await asyncio.sleep(0.5)
+
+        except Exception as e:
+            print(f"[Music] Error in synced lyrics loop: {e}")
+
+        try:
+            embed.description = "⏹️ **Song finished.**"
+            if duration > 0:
+                duration_str = self._fmt_duration(duration)
+                embed.set_footer(text=f"[▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬🔘] {duration_str} / {duration_str}")
+            embed.color = discord.Color.dark_grey()
+            await lyrics_msg.edit(embed=embed)
+        except Exception:
+            pass
+
 
 
 async def setup(bot: commands.Bot):

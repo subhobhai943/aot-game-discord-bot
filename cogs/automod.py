@@ -23,6 +23,8 @@ _request_times: deque = deque()
 RPM_LIMIT = 14
 RPD_LIMIT = 490
 _daily_count = {"date": "", "count": 0}
+_chat_history: dict[int, deque] = {}
+
 
 SYSTEM_PROMPT = """You are Levi Ackerman, captain of the Survey Corps and this Discord server's AI assistant.
 You help with:
@@ -96,8 +98,8 @@ def _get_system_prompt(guild_id: Optional[int]) -> str:
         "Include emojis, a title line starting with 📣, the body details, and a closing line. Do NOT write JSON for announcements.\n"
         "2. If asked to warn/mute/kick/ban a user, respond ONLY with this JSON (no other text):\n"
         '{"action": "warn|mute|kick|ban", "target": "<@userID or username>", "reason": "<reason>"}\n'
-        "3. If the user wants you to play or find music based on their mood/request, respond ONLY with this JSON (no other text):\n"
-        '{"action": "play_music", "query": "<YouTube search term, song name, or one of the built-in playlists: AOT, DEATHNOTE, NARUTO, DEMONSLAYER, BERSERK, VINLANDSAGA, TOKYOREVENGERS, JUJUTSUKAISEN>", "reply": "<Your explanation of choice and instructing them to listen>"}\n'
+        "3. If the user wants you to play or find music, play a playlist, or add a playlist based on their request, mood, or description, respond ONLY with this JSON (no other text):\n"
+        '{"action": "play_music", "query": "<Specific song name, artist, YouTube/Spotify playlist URL, or search term. ONLY use AOT, DEATHNOTE, NARUTO, DEMONSLAYER, BERSERK, VINLANDSAGA, TOKYOREVENGERS, or JUJUTSUKAISEN if the user explicitly requests that specific show\'s overall playlist or soundtrack>", "reply": "<Your brief explanation and instructions to listen>"}\n'
         "4. LANGUAGE RULE: You MUST respond in the same language and script/style as the user's request. Do NOT refuse to answer in other languages. "
         "Translate your personality and tone naturally into their language. "
         "CRITICAL: If the user communicates in Hinglish (Hindi written using the English/Latin alphabet), you MUST respond in Hinglish using the Latin script. "
@@ -211,7 +213,7 @@ def _record_token_usage(guild_id: Optional[int], prompt_tokens: int, completion_
         print(f"[Error saving settings: {e}]")
 
 
-async def call_gemini(prompt: str, system: Optional[str] = None, guild_id: Optional[int] = None) -> tuple[str, str]:
+async def call_gemini(prompt: str, system: Optional[str] = None, guild_id: Optional[int] = None, history: Optional[list[dict]] = None) -> tuple[str, str]:
     if system is None:
         system = _get_system_prompt(guild_id)
     global_nv_key = _get_nvidia_key()
@@ -220,12 +222,21 @@ async def call_gemini(prompt: str, system: Optional[str] = None, guild_id: Optio
 
     if provider == "nvidia" and global_nv_key:
         nv_model = _get_guild_setting(guild_id, "nvidia_model", _get_nvidia_model())
+        messages = [{"role": "system", "content": system}]
+        if history:
+            for msg in history:
+                role = msg["role"]
+                content = msg["content"]
+                if role == "user":
+                    name = msg.get("name", "User")
+                    messages.append({"role": "user", "content": f"{name}: {content}"})
+                else:
+                    messages.append({"role": "assistant", "content": content})
+        messages.append({"role": "user", "content": prompt})
+
         payload = {
             "model": nv_model,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": prompt}
-            ],
+            "messages": messages,
             "temperature": 0.4,
             "max_tokens": 768
         }
@@ -267,9 +278,23 @@ async def call_gemini(prompt: str, system: Optional[str] = None, guild_id: Optio
     
     gemini_model = _get_guild_setting(guild_id, "gemini_model", _get_gemini_model())
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{gemini_model}:generateContent?key={key}"
+    
+    contents = []
+    if history:
+        for msg in history:
+            role = "user" if msg["role"] == "user" else "model"
+            content = msg["content"]
+            if msg["role"] == "user":
+                name = msg.get("name", "User")
+                text = f"{name}: {content}"
+            else:
+                text = content
+            contents.append({"role": role, "parts": [{"text": text}]})
+    contents.append({"role": "user", "parts": [{"text": prompt}]})
+
     payload = {
         "system_instruction": {"parts": [{"text": system}]},
-        "contents": [{"parts": [{"text": prompt}]}],
+        "contents": contents,
         "generationConfig": {"temperature": 0.4, "maxOutputTokens": 768}
     }
     try:
@@ -644,6 +669,12 @@ class AutoMod(commands.Cog):
     async def on_message(self, message: discord.Message):
         if message.author.bot or not message.guild:
             return
+
+        # Check if it's a valid command to avoid duplicate trigger via mention prefix commands
+        ctx = await self.bot.get_context(message)
+        if ctx.valid:
+            return
+
         if self.bot.user not in message.mentions:
             return
 
@@ -696,7 +727,24 @@ class AutoMod(commands.Cog):
                     f"User: {message.author.display_name} (roles: {roles})\n"
                     f"Request: {clean}"
                 )
-            response, model_used = await call_gemini(prompt, guild_id=message.guild.id)
+            # Get or initialize channel history
+            channel_id = message.channel.id
+            if channel_id not in _chat_history:
+                _chat_history[channel_id] = deque(maxlen=20)
+            history_list = list(_chat_history[channel_id])
+
+            response, model_used = await call_gemini(prompt, guild_id=message.guild.id, history=history_list)
+
+        # Record this turn in memory
+        _chat_history[channel_id].append({
+            "role": "user",
+            "name": message.author.display_name,
+            "content": clean
+        })
+        _chat_history[channel_id].append({
+            "role": "assistant",
+            "content": response
+        })
 
         # ── Handle announcement: post to detected channel or current channel ──
         if is_announce:
@@ -1090,6 +1138,8 @@ class AutoMod(commands.Cog):
         try:
             deleted = await interaction.channel.purge(limit=amount)
             count = len(deleted)
+            if interaction.channel.id in _chat_history:
+                _chat_history[interaction.channel.id].clear()
             await interaction.followup.send(f"🧹 Purged **{count}** messages successfully.", ephemeral=True)
             
             # Log the action
@@ -1119,6 +1169,8 @@ class AutoMod(commands.Cog):
         try:
             deleted = await ctx.channel.purge(limit=amount)
             count = len(deleted)
+            if ctx.channel.id in _chat_history:
+                _chat_history[ctx.channel.id].clear()
             # Send confirmation and self-delete after 5 seconds
             confirm = await ctx.send(f"🧹 Purged **{count}** messages successfully.")
             await confirm.delete(delay=5)
@@ -1174,6 +1226,25 @@ class AutoMod(commands.Cog):
             "anime": "Anime Protagonist 🔥"
         }
         await ctx.send(f"✅ AI assistant personality mode updated to **{mode_names[val]}** for this server.")
+
+    @app_commands.command(name="resetmemory", description="Reset the AI's short-term chat memory for this channel 🧠")
+    async def resetmemory_slash(self, interaction: discord.Interaction):
+        channel_id = interaction.channel_id
+        if channel_id in _chat_history:
+            _chat_history[channel_id].clear()
+        embed = discord.Embed(
+            title="🧠 Memory Reset",
+            description="The AI's memory of past conversation in this channel has been cleared.",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @commands.command(name="resetmemory", aliases=["reset", "clearhistory"], help="Reset the AI's short-term chat memory for this channel. Usage: >resetmemory")
+    async def resetmemory_prefix(self, ctx: commands.Context):
+        channel_id = ctx.channel.id
+        if channel_id in _chat_history:
+            _chat_history[channel_id].clear()
+        await ctx.send("🧠 The AI's memory for this channel has been cleared successfully.")
 
     @app_commands.command(name="tokens", description="View AI model details (context size, pricing) and server token usage stats 📊")
     async def tokens_slash(self, interaction: discord.Interaction):

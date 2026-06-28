@@ -104,10 +104,19 @@ Every `/fight` turn dynamically generates a **fresh battle image** using Pillow:
 | `/odm_grapple <distance> [speed] [gas]` | Simulate an ODM gear grapple |
 | `/odm_strike [armor_level] [abilities]` | Simulate a nape strike on a titan |
 
+### 🤖 AI Assistant & AutoMod Commands
+| Command | Prefix | Description |
+|---|---|---|
+| `/aimode <mode>` | `>aimode <mode>` | Change the AI assistant personality (captain, friendly, funny, anime) |
+| `/resetmemory` | `>resetmemory` | Clear the AI's short-term conversation memory for this channel |
+| `/tokens` | `>tokens` | View AI model details, context size, pricing, and token usage |
+| `/purge [amount] [reason]` | `>purge [amount] [reason]` | Purge messages from this channel (automatically clears AI memory) |
+
 ### 🎵 Music Commands
 | Command | Prefix | Description |
 |---|---|---|
 | `/play <query>` | `>p <query>` | Play a song from YouTube, Spotify name, or URL |
+| `/playlyrics <query>` | `>playlyrics <query>` | Play a song and print its synced lyrics in real-time with context emojis |
 | `/skip` | `>skip` | Skip the current song |
 | `/pause` | `>pause` | Pause playback |
 | `/resume` | `>resume` | Resume playback |
@@ -196,9 +205,12 @@ aot-toolkit
 python-dotenv>=1.0.0
 Pillow
 aiohttp>=3.9.0
-yt-dlp>=2024.1.1
+yt-dlp>=2026.6.9
 PyNaCl>=1.5.0
-discord-video-stream-py>=0.1.0
+spotipy>=2.23.0
+syncedlyrics>=1.0.0
+beautifulsoup4>=4.12.3
+rapidfuzz>=3.6.2
 ```
 
 ---
