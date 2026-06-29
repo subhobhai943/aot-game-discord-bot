@@ -1112,9 +1112,14 @@ class Music(commands.Cog):
                     
                 embeds = []
                 for i, chunk in enumerate(chunks):
+                    # Wrap plain lyrics in ansi code block to make it look colorful
+                    ansi_chunk = "```ansi\n"
+                    for line in chunk.splitlines():
+                        ansi_chunk += f"\u001b[1;36m{line}\u001b[0m\n"
+                    ansi_chunk += "```"
                     embed = discord.Embed(
                         title=f"🎤 Lyrics (Plain): {title}",
-                        description=chunk,
+                        description=ansi_chunk,
                         color=discord.Color.blue()
                     )
                     if len(chunks) > 1:
@@ -1281,7 +1286,7 @@ class Music(commands.Cog):
 
         embed = discord.Embed(
             title=f"🎤 Synced Lyrics: {title}",
-            description="🎵 *Instrumental / Intro* 🎵",
+            description="```ansi\n\u001b[1;32m🎵 *Instrumental / Intro* 🎵\u001b[0m\n```",
             color=discord.Color.green()
         )
         lyrics_msg = await channel.send(embed=embed)
@@ -1319,17 +1324,19 @@ class Music(commands.Cog):
                         next_line = self._add_lyrics_emojis(parsed_lyrics[active_line_index + 1][1]) if active_line_index < len(parsed_lyrics) - 1 else ""
 
                         lines = []
+                        lines.append("```ansi")
                         if prev_line:
-                            lines.append(f"*{prev_line}*")
+                            lines.append(f"\u001b[30;1m{prev_line}\u001b[0m")
                         else:
-                            lines.append("\u200b")
+                            lines.append(" ")
 
-                        lines.append(f"➡️ **{current_line}**")
+                        lines.append(f"\u001b[1;33m➡️ \u001b[1;36m{current_line}\u001b[0m")
 
                         if next_line:
-                            lines.append(f"*{next_line}*")
+                            lines.append(f"\u001b[30;1m{next_line}\u001b[0m")
                         else:
-                            lines.append("\u200b")
+                            lines.append(" ")
+                        lines.append("```")
 
                         embed.description = "\n".join(lines)
 
@@ -1356,7 +1363,7 @@ class Music(commands.Cog):
             print(f"[Music] Error in synced lyrics loop: {e}")
 
         try:
-            embed.description = "⏹️ **Song finished.**"
+            embed.description = "```ansi\n\u001b[1;30m⏹️ Song finished.\u001b[0m\n```"
             if duration > 0:
                 duration_str = self._fmt_duration(duration)
                 embed.set_footer(text=f"[▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬🔘] {duration_str} / {duration_str}")
